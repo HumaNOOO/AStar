@@ -1,3 +1,5 @@
+//test czy git działa
+
 #include <iostream>
 
 #include "Graph.hpp"
