@@ -22,7 +22,7 @@ namespace astar
 		static constexpr float border_{ 4.f };
 		std::vector<Connection> connections_;
 		sf::CircleShape circle_;
-
+		void changePos(const sf::Vector2f& mousePos);
 		Node& operator=(const Node& other);
 		Node& operator=(Node&& other) noexcept;
 

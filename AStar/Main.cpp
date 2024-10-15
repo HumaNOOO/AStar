@@ -12,10 +12,10 @@ int main()
 	cs.antialiasingLevel = 16;
 	sf::RenderWindow window(sf::VideoMode(1270, 768), "A*", sf::Style::Default, cs);
 	window.setVerticalSyncEnabled(true);
-	bool canPlace{ true };
 	bool modeBuildConnection{ false };
-	astar::Graph::getInstance().setDrawDistance(true);
-
+	bool movingNode{ false };
+	astar::Graph::getInstance().setDrawDistance(false);
+	astar::Graph::getInstance().setDrawIds(true);
 	while (window.isOpen())
 	{
 		if (!window.hasFocus())
@@ -28,6 +28,17 @@ int main()
 
 		while (window.pollEvent(event))
 		{
+			if (movingNode) {
+				if(event.type==10)
+				{
+					movingNode = false;
+					astar::Graph::getInstance().clearSavedNode();
+				}
+				else {
+					astar::Graph::getInstance().moveNode(mousePos);
+					break;
+				}
+			}
 			switch (event.type)
 			{
 			case sf::Event::Closed:
@@ -47,6 +58,10 @@ int main()
 					break;
 				case sf::Keyboard::LShift:
 					modeBuildConnection = !modeBuildConnection;
+					astar::Graph::getInstance().clearSavedNode();
+					break;
+				case sf::Keyboard::Q:
+					astar::Graph::getInstance().selectNodes(mousePos);
 					break;
 				case sf::Keyboard::O:
 					astar::Graph::getInstance().increaseOffset(-1);
@@ -64,7 +79,16 @@ int main()
 				case sf::Mouse::Left:
 					if (!modeBuildConnection)
 					{
-						astar::Graph::getInstance().addNode(mousePos);
+						auto checkmouseup = astar::Graph::getInstance().checkMouseOnSomething(mousePos);
+						if(checkmouseup)
+						{
+							movingNode = true;
+						}
+						else
+						{
+							astar::Graph::getInstance().addNode(mousePos);
+						}
+						
 					}
 					else
 					{

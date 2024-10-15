@@ -16,7 +16,10 @@ namespace astar
 
 		std::cout << std::format("Creating node at ({},{}) with id={}\n", x, y, id);
 	}
-
+	void Node::changePos(const sf::Vector2f& mousepos)
+	{
+		circle_.setPosition(mousepos.x, mousepos.y);
+	}
 	const sf::Vector2f& Node::getPos() const
 	{
 		return circle_.getPosition();

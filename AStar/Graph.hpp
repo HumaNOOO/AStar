@@ -22,9 +22,15 @@ namespace astar
 		void resetNodes();
 		void update();
 		void increaseOffset(const float offset);
+		Node* checkMouseOnSomething(sf::Vector2f mousePos);
+		void moveNode(sf::Vector2f mousePos);
+		void clearSavedNode();
+		void setDrawIds(const bool drawIds);
+		void selectNodes(const sf::Vector2f& mousePos);
 	private:
 		void handleRecalculate();
 		float offset_;
+		bool drawIds_;
 		Graph();
 		Node* savedNode_; //Saved Node to make Connections between
 		std::vector<Node> nodesCached_;
@@ -33,5 +39,7 @@ namespace astar
 		bool nodesChanged_;
 		long freeInd_;
 		bool shouldRecalculate_;
+		Node* startTarget_;
+		Node* endTarget_;
 	};
 }
