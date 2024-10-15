@@ -7,71 +7,73 @@
 
 int main()
 {
-    std::ios_base::sync_with_stdio(0);
-    sf::RenderWindow window(sf::VideoMode(1270, 768), "A*");
-    window.setVerticalSyncEnabled(true);
-    bool canPlace{ true };
-    bool modeBuildConnection{ false };
-    //astar::Graph::getInstance().setDrawDistance(true);
-    
-    while (window.isOpen())
-    {
-        if (!window.hasFocus()) 
-        {
-            continue;
-        }
-        sf::Event event;
-        while (window.pollEvent(event))
-        {
-            if (event.type == sf::Event::Closed)
-                window.close();
-        }
+	std::ios_base::sync_with_stdio(0);
+	sf::ContextSettings cs;
+	cs.antialiasingLevel = 16;
+	sf::RenderWindow window(sf::VideoMode(1270, 768), "A*", sf::Style::Default, cs);
+	window.setVerticalSyncEnabled(true);
+	bool canPlace{ true };
+	bool modeBuildConnection{ false };
+	//astar::Graph::getInstance().setDrawDistance(true);
 
-        sf::Vector2f mousePos(sf::Mouse::getPosition(window));
+	while (window.isOpen())
+	{
+		if (!window.hasFocus())
+		{
+			continue;
+		}
 
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !modeBuildConnection)
-        {
-            if (canPlace)
-            {
-                astar::Graph::getInstance().addNode(mousePos);
-                canPlace = false;
-            }
-        }
-        else if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && modeBuildConnection) {
-            if(canPlace)
-            {
-                astar::Graph::getInstance().makeConnection(mousePos);
-                canPlace = false;
-            }
-            
-        }
-        else if (sf::Mouse::isButtonPressed(sf::Mouse::Right))
-        {
-            astar::Graph::getInstance().checkAndDelete(mousePos);
-        }
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::RAlt)) {
-            if (canPlace)
-            {
-                astar::Graph::getInstance().setCollision(mousePos);
-                canPlace = false;
-            }
-        }
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))
-        {
-            if (canPlace) {
-                modeBuildConnection = !modeBuildConnection;
-                canPlace = false;
-            }
-        }
-        else
-        {
-            canPlace = true;
-        }
+		sf::Event event;
+		sf::Vector2f mousePos(sf::Mouse::getPosition(window));
 
+		while (window.pollEvent(event))
+		{
+			switch (event.type)
+			{
+			case sf::Event::Closed:
+				window.close();
+				break;
+			case sf::Event::Resized:
+				window.setView(sf::View(sf::FloatRect(0, 0, event.size.width, event.size.height)));
+				break;
+			case sf::Event::KeyPressed:
+				switch (event.key.code)
+				{
+				case sf::Keyboard::R:
+					astar::Graph::getInstance().resetNodes();
+					break;
+				case sf::Keyboard::Escape:
+					window.close();
+					break;
+				case sf::Keyboard::LShift:
+					modeBuildConnection = !modeBuildConnection;
+					break;
+				case sf::Keyboard::LAlt:
+					astar::Graph::getInstance().setCollision(mousePos);
+					break;
+				}
+			case sf::Event::MouseButtonPressed:
+				switch (event.mouseButton.button)
+				{
+				case sf::Mouse::Left:
+					if (!modeBuildConnection)
+					{
+						astar::Graph::getInstance().addNode(mousePos);
+					}
+					else
+					{
+						astar::Graph::getInstance().makeConnection(mousePos);
+					}
+					break;
+				case sf::Mouse::Right:
+					astar::Graph::getInstance().checkAndDelete(mousePos);
+					break;
+				}
+			}
+		}
 
-        window.clear();
-        astar::Graph::getInstance().draw(window, mousePos, modeBuildConnection);
-
-        window.display();
-    }
+		window.clear();
+		astar::Graph::getInstance().draw(window, mousePos, modeBuildConnection);
+		window.display();
+	}
 }
