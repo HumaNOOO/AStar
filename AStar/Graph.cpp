@@ -26,22 +26,51 @@ namespace astar
 		offset_ += offset;
 	}
 
+	void Graph::selectNodes(const sf::Vector2f& mousePos) {
+		Node* getNodeFromMouse = checkMouseOnSomething(mousePos);
+		if (!startTarget_)
+		{
+			startTarget_ = getNodeFromMouse;
+		}
+		else if (!endTarget_)
+		{
+			endTarget_ = getNodeFromMouse;
+		}
+		else
+		{
+			startTarget_ = nullptr;
+			endTarget_ = nullptr;
+		}
+	}
+
 	void Graph::draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos, bool makeConnection) const
 	{
 		sf::Text modeBlock;
-
 		if (makeConnection)
 		{
 			modeBlock.setString("Connection Mode: True");
 		}
+
 		else
 		{
 			modeBlock.setString("Connection Mode: False");
 		}
 
+		if (startTarget_)
+		{
+			modeBlock.setString(modeBlock.getString() + "\nStart Target: " + std::to_string(startTarget_->id()));
+		}
+
+		if (endTarget_)
+		{
+			modeBlock.setString(modeBlock.getString() + "\nEnd Target: " + std::to_string(endTarget_->id()));
+		}
+
 		modeBlock.setPosition(0, 15);
 		modeBlock.setFont(font_);
 		rt.draw(modeBlock);
+
+
 		sf::CircleShape circle(Node::radius_);
 		sf::Text text;
 		text.setCharacterSize(16);
@@ -73,9 +102,11 @@ namespace astar
 				text.setString(std::to_string(node.getDistanceFromMouse(mousePos)));
 				text.setFillColor(sf::Color::White);
 				rt.draw(text);
+			}
+			if (drawIds_) {
 				std::string test = std::to_string(node.id());
-				float width = test.size() * offset_/2.f;
-				text.setPosition(node.getPos().x- width, node.getPos().y-8.f); //2.5
+				float width = test.size() * offset_ / 2.f;
+				text.setPosition(node.getPos().x - width, node.getPos().y - 8.f); //2.5
 				text.setString(std::to_string(node.id()));
 				text.setFillColor(sf::Color::Black);
 				rt.draw(text);
@@ -95,14 +126,51 @@ namespace astar
 		}
 	}
 
+	void Graph::clearSavedNode() {
+		savedNode_ = nullptr;
+	}
+
+	void Graph::moveNode(const sf::Vector2f mousePos) 
+	{
+		Node* checkMouseUp = astar::Graph::getInstance().checkMouseOnSomething(mousePos);
+		if (checkMouseUp && !savedNode_)
+		{
+			checkMouseUp->changePos(mousePos);
+			savedNode_ = checkMouseUp;
+		}
+		else if (savedNode_)
+		{
+			savedNode_->changePos(mousePos);
+		}
+	}
+
 	void Graph::checkAndDelete(const sf::Vector2f& mousePos)
 	{
-		for (const auto& nd : nodesCached_)
+		for (auto& nd : nodesCached_)
 		{
 			if (nd.isMouseOver(mousePos))
 			{
-				Timer t;
-
+				for (auto& node : nodesCached_)
+				{
+					if (&node != &nd) {
+						for (int i = 0; i < node.connections_.size(); i++)
+						{
+							if (node.connections_[i].end_ == &nd)
+							{
+								node.connections_.erase(node.connections_.begin() + i);
+							}
+						}
+					}
+				}
+				nd.connections_.clear(); //wtf?
+				if (&nd == startTarget_) 
+				{
+					startTarget_ = nullptr;
+				}
+				else if (&nd == endTarget_)
+				{
+					endTarget_ = nullptr;
+				}
 				std::erase_if(nodesCached_, [addr = &nd](const Node& node) { return &node == addr; });
 
 				break;
@@ -115,6 +183,22 @@ namespace astar
 		drawDistance_ = drawDistance;
 	}
 
+	void Graph::setDrawIds(const bool drawIds)
+	{
+		drawIds_ = drawIds;
+	}
+
+	Node* Graph::checkMouseOnSomething(sf::Vector2f mousePos)
+	{
+		for (auto& node : nodesCached_) 
+		{
+			if (node.isMouseOver(mousePos))
+			{
+				return &node;
+			}
+		}
+		return nullptr;
+	}
 	void Graph::makeConnection(sf::Vector2f& mousePos)
 	{
 		for (auto& node : nodesCached_)
@@ -123,24 +207,21 @@ namespace astar
 			{
 				if (savedNode_ && savedNode_ != &node)
 				{
-					for (const auto& node2 : nodesCached_)
+					for (const auto& connStart : savedNode_->connections_)
 					{
-						for (const auto& conn : node.connections_)
+						if (savedNode_ == connStart.end_)
 						{
-							if (savedNode_ == conn.end_)
-							{
-								//return;
-							}
-						}
-
-						for (const auto& conn : node2.connections_)
-						{
-							if (savedNode_ == conn.end_)
-							{
-								//return;
-							}
+							return;
 						}
 					}
+					for (const auto& conn : node.connections_) 
+					{
+						if (savedNode_ == conn.end_) 
+						{
+							return;
+						}
+					}
+					
 					savedNode_->connections_.emplace_back(&node, 1, true); //Cost always 1
 					node.connections_.emplace_back(savedNode_, 1, false);
 					savedNode_ = nullptr;
