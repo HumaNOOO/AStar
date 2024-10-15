@@ -1,7 +1,7 @@
 #include "Graph.hpp"
 #include "Connection.hpp"
 #include <iostream>
-
+#include "Timer.hpp"
 
 namespace astar
 {
@@ -19,6 +19,11 @@ namespace astar
 	void Graph::addNode(const sf::Vector2f& pos)
 	{
 		nodesCached_.emplace_back(pos.x, pos.y, freeInd_++);
+	}
+
+	void Graph::increaseOffset(const float offset) 
+	{
+		offset_ += offset;
 	}
 
 	void Graph::draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos, bool makeConnection) const
@@ -66,6 +71,13 @@ namespace astar
 			{
 				text.setPosition(node.getPos().x - 35.f, node.getPos().y + 32.f);
 				text.setString(std::to_string(node.getDistanceFromMouse(mousePos)));
+				text.setFillColor(sf::Color::White);
+				rt.draw(text);
+				std::string test = std::to_string(node.id());
+				float width = test.size() * offset_/2.f;
+				text.setPosition(node.getPos().x- width, node.getPos().y-8.f); //2.5
+				text.setString(std::to_string(node.id()));
+				text.setFillColor(sf::Color::Black);
 				rt.draw(text);
 			}
 		}
@@ -89,7 +101,10 @@ namespace astar
 		{
 			if (nd.isMouseOver(mousePos))
 			{
+				Timer t;
+
 				std::erase_if(nodesCached_, [addr = &nd](const Node& node) { return &node == addr; });
+
 				break;
 			}
 		}
@@ -114,7 +129,7 @@ namespace astar
 						{
 							if (savedNode_ == conn.end_)
 							{
-								return;
+								//return;
 							}
 						}
 
@@ -122,7 +137,7 @@ namespace astar
 						{
 							if (savedNode_ == conn.end_)
 							{
-								return;
+								//return;
 							}
 						}
 					}
@@ -155,7 +170,7 @@ namespace astar
 
 	}
 
-	Graph::Graph() : drawDistance_{ false }, savedNode_{}, nodesChanged_{}, freeInd_{}, shouldRecalculate_{}
+	Graph::Graph() : drawDistance_{ false }, savedNode_{}, nodesChanged_{}, freeInd_{}, shouldRecalculate_{}, offset_{10.f}
 	{
 		nodesCached_.reserve(1000);
 		std::cout << "Graph::Graph()\n";

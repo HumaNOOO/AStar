@@ -14,7 +14,7 @@ int main()
 	window.setVerticalSyncEnabled(true);
 	bool canPlace{ true };
 	bool modeBuildConnection{ false };
-	//astar::Graph::getInstance().setDrawDistance(true);
+	astar::Graph::getInstance().setDrawDistance(true);
 
 	while (window.isOpen())
 	{
@@ -47,6 +47,12 @@ int main()
 					break;
 				case sf::Keyboard::LShift:
 					modeBuildConnection = !modeBuildConnection;
+					break;
+				case sf::Keyboard::O:
+					astar::Graph::getInstance().increaseOffset(-1);
+					break;
+				case sf::Keyboard::P:
+					astar::Graph::getInstance().increaseOffset(1);
 					break;
 				case sf::Keyboard::LAlt:
 					astar::Graph::getInstance().setCollision(mousePos);

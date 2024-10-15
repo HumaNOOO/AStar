@@ -10,6 +10,7 @@ namespace astar
 	{
 	public:
 		Timer(std::function<void()> callback = std::function<void()>{}, long long delay = 0);
+		~Timer();
 	private:
 		std::function<void()> callback_;
 		long long delay_;
