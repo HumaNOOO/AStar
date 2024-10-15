@@ -21,9 +21,10 @@ namespace astar
 		void makeConnection(sf::Vector2f& mousePos);
 		void resetNodes();
 		void update();
+		void increaseOffset(const float offset);
 	private:
 		void handleRecalculate();
-
+		float offset_;
 		Graph();
 		Node* savedNode_; //Saved Node to make Connections between
 		std::vector<Node> nodesCached_;
