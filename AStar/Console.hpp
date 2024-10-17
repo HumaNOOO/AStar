@@ -25,12 +25,16 @@ namespace astar
 		void toggle();
 		void addChar(const char c);
 		bool isOpen() const;
+		void resetCarriage(const sf::Vector2f& carriagePos);
 		void draw(sf::RenderTarget& rt);
+		void moveCarriage(const bool left);
 	private:
 		Console();
+		constexpr static int carriageOffset_{ 10 };
 		void executeCommand(const std::string& command, std::optional<std::vector<std::string>> args = std::nullopt);
 		bool consoleOpen_;
 		size_t cursorPos_;
+		sf::RectangleShape carriage_;
 		std::string currentText_;
 		std::vector<Command> callbacks_;
 		std::vector<std::string> history_;

@@ -8,7 +8,10 @@ int main()
 	std::ios_base::sync_with_stdio(0);
 	sf::ContextSettings cs;
 	cs.antialiasingLevel = 16;
-	sf::RenderWindow window(sf::VideoMode(1270, 768), "A*", sf::Style::Default, cs);
+	constexpr unsigned windowWidth{ 1270 };
+	constexpr unsigned windowHeight{ 768 };
+	sf::RenderWindow window(sf::VideoMode(windowWidth, windowHeight), "A*", sf::Style::Default, cs);
+	astar::Console::getInstance().resetCarriage({ 4, windowHeight - 20 });
 	window.setVerticalSyncEnabled(true);
 	bool movingNode{ false };
 	astar::Graph::getInstance().setDrawDistance(false);
@@ -25,17 +28,20 @@ int main()
 
 		while (window.pollEvent(event))
 		{
-			if (movingNode) {
+			if (movingNode)
+			{
 				if(event.type==10)
 				{
 					movingNode = false;
 					astar::Graph::getInstance().clearSavedNode();
 				}
-				else {
+				else 
+				{
 					astar::Graph::getInstance().moveNode(mousePos);
 					break;
 				}
 			}
+
 			switch (event.type)
 			{
 			case sf::Event::Closed:
@@ -43,6 +49,7 @@ int main()
 				break;
 			case sf::Event::Resized:
 				window.setView(sf::View(sf::FloatRect(0, 0, static_cast<float>(event.size.width), static_cast<float>(event.size.height))));
+				astar::Console::getInstance().resetCarriage({ 4, static_cast<float>(event.size.height) });
 				break;
 			case sf::Event::TextEntered:
 				if (astar::Console::getInstance().isOpen())
@@ -74,6 +81,12 @@ int main()
 					break;
 				case sf::Keyboard::LAlt:
 					astar::Graph::getInstance().setCollision(mousePos);
+					break;
+				case sf::Keyboard::Left:
+					astar::Console::getInstance().moveCarriage(true);
+					break;
+				case sf::Keyboard::Right:
+					astar::Console::getInstance().moveCarriage(false);
 					break;
 				}
 				break;

@@ -10,7 +10,7 @@ namespace astar
 		return console;
 	}
 
-	Console::Console() : consoleOpen_{ false }, cursorPos_{ 0 }
+	Console::Console() : consoleOpen_{ false }, cursorPos_{ 1 }
 	{
 		std::cout << "Console::Console()\n";
 		callbacks_.emplace_back("reset", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().resetNodes(); });
@@ -19,6 +19,8 @@ namespace astar
 		text_.setFont(font_);
 		text_.setCharacterSize(16);
 		history_.reserve(20);
+		carriage_.setFillColor(sf::Color::White);
+		carriage_.setSize({ 1, 16 });
 	}
 
 	void Console::handleInput(const sf::Keyboard::Key key)
@@ -29,7 +31,6 @@ namespace astar
 		}
 		else if (key == 13 && !currentText_.empty())
 		{
-			std::cout << "executing command: " << currentText_ << '\n';
 			executeCommand(currentText_);
 		}
 
@@ -47,12 +48,16 @@ namespace astar
 		if (c != 8 && c != '`' && c != 13)
 		{
 			currentText_ += c;
+			carriage_.move(carriageOffset_, 0);
+			++cursorPos_;
 		}
 		else if(c == 8)
 		{
-			if (!currentText_.empty())
+			if (!currentText_.empty() && cursorPos_ > 1)
 			{
 				currentText_.pop_back();
+				carriage_.move(-carriageOffset_, 0);
+				--cursorPos_;
 			}
 		}
 	}
@@ -75,13 +80,19 @@ namespace astar
 			std::cout << "history size: " << history_.size() << '\n';
 			std::cout << "current text size: " << currentText_.size() << '\n';
 
-			if (history_.size() >= 20)
+			if (history_.size() >= 40)
 			{
 				history_.erase(history_.begin());
 			}
 		}
 
 		currentText_.clear();
+		carriage_.setPosition(4, carriage_.getPosition().y);
+	}
+
+	void Console::resetCarriage(const sf::Vector2f& carriagePos)
+	{
+		carriage_.setPosition(carriagePos);
 	}
 
 	void Console::draw(sf::RenderTarget& rt)
@@ -91,14 +102,14 @@ namespace astar
 			const auto& size = rt.getSize();
 
 			sf::RectangleShape rect(sf::Vector2f{ size });
-			rect.setFillColor(sf::Color(0, 0, 0, 70));
+			rect.setFillColor(sf::Color(0, 0, 0, 30));
 			text_.setString(currentText_);
 			text_.setFillColor(sf::Color::White);
-			text_.setPosition(5, size.y - 20);
+			text_.setPosition(4, size.y - 22);
 			rt.draw(rect);
 			rt.draw(text_);
 
-			float textPos{ 30.f };
+			float textPos{ 40.f };
 			for (std::vector<std::string>::reverse_iterator rIter{ history_.rbegin() }; rIter != history_.rend(); ++rIter)
 			{
 				std::string cpy;
@@ -113,9 +124,30 @@ namespace astar
 					cpy = *rIter;
 				}
 
-				text_.setPosition(5, size.y - (textPos += 18));
+				text_.setPosition(4, size.y - (textPos += 18));
 				text_.setString(cpy);
 				rt.draw(text_);
+			}
+
+			rt.draw(carriage_);
+		}
+	}
+
+	void Console::moveCarriage(const bool left)
+	{
+		if (!currentText_.empty())
+		{
+			if (left && cursorPos_ > 1)
+			{
+				--cursorPos_;
+				carriage_.move(-carriageOffset_, 0);
+				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << cursorPos_ << '\n';
+			}
+			else if(!left && cursorPos_ <= currentText_.size())
+			{
+				++cursorPos_;
+				carriage_.move(carriageOffset_, 0);
+				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << cursorPos_ << '\n';
 			}
 		}
 	}
