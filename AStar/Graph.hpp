@@ -20,6 +20,7 @@ namespace astar
 		void setCollision(const sf::Vector2f& mousePos);
 		void makeConnection(const sf::Vector2f& mousePos);
 		void resetNodes();
+		void deleteNode(const int id);
 		void update();
 		void increaseOffset(const float offset);
 		Node* checkMouseOnSomething(const sf::Vector2f& mousePos);
@@ -46,5 +47,6 @@ namespace astar
 		bool buildConnectionMode_;
 		Node* startTarget_;
 		Node* endTarget_;
+		std::vector<std::pair<int, int>> connections_;
 	};
 }

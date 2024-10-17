@@ -18,11 +18,6 @@ int main()
 	astar::Graph::getInstance().setDrawIds(true);
 	while (window.isOpen())
 	{
-		if (!window.hasFocus())
-		{
-			continue;
-		}
-
 		sf::Event event;
 		sf::Vector2f mousePos(sf::Mouse::getPosition(window));
 

@@ -21,7 +21,7 @@ namespace astar
 		nodesCached_.emplace_back(pos.x, pos.y, freeInd_++);
 	}
 
-	void Graph::increaseOffset(const float offset) 
+	void Graph::increaseOffset(const float offset)
 	{
 		offset_ += offset;
 	}
@@ -97,7 +97,7 @@ namespace astar
 				rt.draw(text_);
 			}
 
-			if (drawIds_) 
+			if (drawIds_)
 			{
 				const std::string nodeId = std::to_string(node.id());
 				const float width = nodeId.size() * offset_ / 2.f;
@@ -110,7 +110,7 @@ namespace astar
 	}
 
 	void Graph::setCollision(const sf::Vector2f& mousePos)
-{
+	{
 		for (auto& node : nodesCached_)
 		{
 			if (node.isMouseOver(mousePos))
@@ -121,12 +121,12 @@ namespace astar
 		}
 	}
 
-	void Graph::clearSavedNode() 
+	void Graph::clearSavedNode()
 	{
 		savedNode_ = nullptr;
 	}
 
-	void Graph::moveNode(const sf::Vector2f mousePos) 
+	void Graph::moveNode(const sf::Vector2f mousePos)
 	{
 		Node* checkMouseUp = astar::Graph::getInstance().checkMouseOnSomething(mousePos);
 		if (checkMouseUp && !savedNode_)
@@ -146,20 +146,10 @@ namespace astar
 		{
 			if (nd.isMouseOver(mousePos))
 			{
-				for (auto& node : nodesCached_)
-				{
-					if (&node != &nd) {
-						for (int i = 0; i < node.connections_.size(); i++)
-						{
-							if (node.connections_[i].end_ == &nd)
-							{
-								node.connections_.erase(node.connections_.begin() + i);
-							}
-						}
-					}
-				}
-				nd.connections_.clear(); //wtf?
-				if (&nd == startTarget_) 
+				std::erase_if(connections_, [&nd](const std::pair<int, int>& con) { return con.first == nd.id() || con.second == nd.id(); });
+				std::erase_if(nodesCached_, [&nd](Node& node) {return &node == &nd; });
+
+				if (&nd == startTarget_)
 				{
 					startTarget_ = nullptr;
 				}
@@ -167,12 +157,16 @@ namespace astar
 				{
 					endTarget_ = nullptr;
 				}
-
-				std::erase_if(nodesCached_, [&nd](const Node& node) { return &node == &nd; });
-
 				break;
 			}
 		}
+
+		for (auto& nd : nodesCached_)
+		{
+			nd.connections_.clear();
+		}
+
+		handleRecalculate();
 	}
 
 	void Graph::setDrawDistance(const bool drawDistance)
@@ -187,7 +181,7 @@ namespace astar
 
 	Node* Graph::checkMouseOnSomething(const sf::Vector2f& mousePos)
 	{
-		for (auto& node : nodesCached_) 
+		for (auto& node : nodesCached_)
 		{
 			if (node.isMouseOver(mousePos))
 			{
@@ -211,16 +205,28 @@ namespace astar
 							return;
 						}
 					}
-					for (const auto& conn : node.connections_) 
+					for (const auto& conn : node.connections_)
 					{
-						if (savedNode_ == conn.end_) 
+						if (savedNode_ == conn.end_)
 						{
 							return;
 						}
 					}
-					
-					savedNode_->connections_.emplace_back(&node, 1, true); //Cost always 1
+
+					savedNode_->connections_.emplace_back(&node, 1, true);
+					std::cout << savedNode_ << "->" << &node << '\n';
 					node.connections_.emplace_back(savedNode_, 1, false);
+					std::cout << &node << "->" << savedNode_ << '\n';
+
+					connections_.emplace_back(savedNode_->id(), node.id());
+
+					for (const auto& [left, right] : connections_)
+					{
+						std::cout << std::format("{}->{}\n", left, right);
+					}
+					std::cout << "#######################\n";
+
+
 					savedNode_ = nullptr;
 				}
 				else
@@ -238,6 +244,24 @@ namespace astar
 		freeInd_ = 0;
 	}
 
+	void Graph::deleteNode(const int id)
+	{
+		std::erase_if(nodesCached_, [id](const Node& node)
+			{
+				std::cout << "node.id(): " << node.id() << ", arg id: " << id << '\n';
+				return node.id() == id;
+			});
+
+		std::erase_if(connections_, [id](const std::pair<int, int>& con) { return con.first == id || con.second == id; });
+
+		for (auto& nd : nodesCached_)
+		{
+			nd.connections_.clear();
+		}
+
+		handleRecalculate();
+	}
+
 	void Graph::update()
 	{
 
@@ -245,7 +269,24 @@ namespace astar
 
 	void Graph::handleRecalculate()
 	{
-
+		Timer t;
+		for (const auto& [left, right] : connections_)
+		{
+			for (Node& node_l : nodesCached_)
+			{
+				if (node_l.id() == left)
+				{
+					for (Node& node_r : nodesCached_)
+					{
+						if (node_r.id() == right)
+						{
+							node_l.connections_.emplace_back(&node_r, 1, true);
+							node_r.connections_.emplace_back(&node_l, 1, false);
+						}
+					}
+				}
+			}
+		}
 	}
 
 	Graph::Graph() : drawDistance_{ false }, savedNode_{}, nodesChanged_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 10.f }, drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}

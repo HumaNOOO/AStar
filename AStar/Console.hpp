@@ -11,7 +11,7 @@
 
 namespace
 {
-	using Command = std::tuple<std::string, std::function<void(std::optional<std::vector<std::string>>)>>;
+	using Command = std::tuple<std::string, std::function<void(std::optional<std::vector<std::string>>)>, bool>;
 }
 
 namespace astar
@@ -31,7 +31,7 @@ namespace astar
 	private:
 		Console();
 		constexpr static int carriageOffset_{ 10 };
-		void executeCommand(const std::string& command, std::optional<std::vector<std::string>> args = std::nullopt);
+		void executeCommand(std::string& command);
 		bool consoleOpen_;
 		size_t cursorPos_;
 		sf::RectangleShape carriage_;

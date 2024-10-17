@@ -1,5 +1,6 @@
 #include "Console.hpp"
 #include <iostream>
+#include <algorithm>
 
 
 namespace astar
@@ -13,8 +14,15 @@ namespace astar
 	Console::Console() : consoleOpen_{ false }, cursorPos_{ 1 }
 	{
 		std::cout << "Console::Console()\n";
-		callbacks_.emplace_back("reset", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().resetNodes(); });
-		callbacks_.emplace_back("conn", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().toggleConnectionMode(); });
+		callbacks_.emplace_back("reset", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().resetNodes(); }, false);
+		callbacks_.emplace_back("conn", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().toggleConnectionMode(); }, false);
+		callbacks_.emplace_back("del", [](std::optional<std::vector<std::string>> args){
+			if (std::all_of(args->at(0).begin(), args->at(0).end(), [](const char c) {return std::isdigit(c); }))
+			{
+				std::cout << "executing command: del " << std::stoi(args->at(0)) << '\n';
+				astar::Graph::getInstance().deleteNode((std::stoi(args->at(0))));
+			}
+		}, true);
 		font_.loadFromFile("mono.ttf");
 		text_.setFont(font_);
 		text_.setCharacterSize(16);
@@ -67,16 +75,83 @@ namespace astar
 		return consoleOpen_;
 	}
 
-	void Console::executeCommand(const std::string& command, std::optional<std::vector<std::string>> args)
+	void Console::executeCommand(std::string& command)
 	{
-		if (const auto& pos = std::find_if(callbacks_.begin(), callbacks_.end(), [&command](const Command& cmd) { return std::get<0>(cmd) == command; }); pos != callbacks_.end())
+		if (command[0] == ' ')
 		{
-			history_.push_back(command);
-			std::get<1>(*pos)(args);
+			auto found_l = std::find_if(command.begin(), command.end(), [](const char c) { return c != ' '; });
+
+			if (found_l != command.end())
+			{
+				command.erase(command.begin(), found_l);
+			}
+		}
+
+		if (command.back() == ' ')
+		{
+			for (int i = command.size() - 1; i >= 0; i--)
+			{
+				if (command[i] != ' ')
+				{
+					std::cout << "command[" << i << "] is: " << command[i] << " deleting\n";
+					command.erase(command.begin() + i + 1, command.end());
+					break;
+				}
+				else
+				{
+					std::cout << "command[" << i << "] is: " << command[i] << " not deleting\n";
+				}
+			}
+		}
+
+		std::vector<std::string> split;
+		split.reserve(2);
+		size_t pos = 0;
+		std::string token;
+
+		if (std::count(command.begin(), command.end(), ' ') > 0)
+		{
+			while ((pos = command.find(' ')) != std::string::npos)
+			{
+				split.push_back(command.substr(0, pos));
+				command.erase(0, pos + 1);
+				split.push_back(command);
+			}
+		}
+		else
+		{
+			split.push_back(command);
+		}
+
+
+		if (const auto& pos = std::find_if(callbacks_.begin(), callbacks_.end(), [command = split[0]](const Command& cmd) { return std::get<0>(cmd) == command; }); pos != callbacks_.end())
+		{
+			if (!std::get<2>(*pos))
+			{
+				history_.push_back(split[0]);
+				std::get<1>(*pos)(std::nullopt);
+			}
+			else
+			{
+				if (split.size() < 2)
+				{
+					history_.push_back("&&R" + split[0] + " - command expects arguments!");
+
+					if (history_.size() >= 40)
+					{
+						history_.erase(history_.begin());
+					}
+				}
+				else
+				{
+					history_.push_back(split[0] + ' ' + split[1]);
+					std::get<1>(*pos)(std::vector{ split[1] });
+				}
+			}
 		}
 		else if(!currentText_.empty())
 		{
-			history_.push_back("&&R" + command + " - unknown command!");
+			history_.push_back("&&R" + split[0] + " - unknown command!");
 			std::cout << "history size: " << history_.size() << '\n';
 			std::cout << "current text size: " << currentText_.size() << '\n';
 
@@ -102,7 +177,7 @@ namespace astar
 			const auto& size = rt.getSize();
 
 			sf::RectangleShape rect(sf::Vector2f{ size });
-			rect.setFillColor(sf::Color(0, 0, 0, 30));
+			rect.setFillColor(sf::Color(0, 0, 0, 175));
 			text_.setString(currentText_);
 			text_.setFillColor(sf::Color::White);
 			text_.setPosition(4, size.y - 22);

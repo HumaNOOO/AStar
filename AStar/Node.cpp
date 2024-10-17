@@ -16,10 +16,12 @@ namespace astar
 
 		std::cout << std::format("Creating node at ({},{}) with id={}\n", x, y, id);
 	}
+
 	void Node::changePos(const sf::Vector2f& mousepos)
 	{
 		circle_.setPosition(mousepos.x, mousepos.y);
 	}
+
 	const sf::Vector2f& Node::getPos() const
 	{
 		return circle_.getPosition();
@@ -70,7 +72,7 @@ namespace astar
 		{
 			id_ = other.id_;
 			circle_ = other.circle_;
-			//std::cout << "Node::operator=(const Node& other) called\n";
+			std::cout << "Node::operator=(const Node& other) called\n";
 		}
 		return *this;
 	}
@@ -81,7 +83,7 @@ namespace astar
 		{
 			id_ = std::move(other.id_);
 			circle_ = std::move(other.circle_);
-			//std::cout << "Node::operator=(Node&& other) called\n";
+			std::cout << "Node::operator=(Node&& other) called\n";
 		}
 		return *this;
 	}
