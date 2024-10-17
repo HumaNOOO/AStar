@@ -43,38 +43,31 @@ namespace astar
 		}
 	}
 
-	void Graph::draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos, bool makeConnection) const
+	bool Graph::isBuildConnectionMode() const
 	{
-		sf::Text modeBlock;
-		if (makeConnection)
-		{
-			modeBlock.setString("Connection Mode: True");
-		}
+		return buildConnectionMode_;
+	}
 
-		else
-		{
-			modeBlock.setString("Connection Mode: False");
-		}
+	void Graph::toggleConnectionMode()
+	{
+		connectionText_.setString((buildConnectionMode_ = !buildConnectionMode_) ? "Connection Mode: True" : "Connection Mode: False");
+	}
 
+	void Graph::draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos)
+	{
 		if (startTarget_)
 		{
-			modeBlock.setString(modeBlock.getString() + "\nStart Target: " + std::to_string(startTarget_->id()));
+			connectionText_.setString(connectionText_.getString() + "\nStart Target: " + std::to_string(startTarget_->id()));
 		}
 
 		if (endTarget_)
 		{
-			modeBlock.setString(modeBlock.getString() + "\nEnd Target: " + std::to_string(endTarget_->id()));
+			connectionText_.setString(connectionText_.getString() + "\nEnd Target: " + std::to_string(endTarget_->id()));
 		}
 
-		modeBlock.setPosition(0, 15);
-		modeBlock.setFont(font_);
-		rt.draw(modeBlock);
-
+		rt.draw(connectionText_);
 
 		sf::CircleShape circle(Node::radius_);
-		sf::Text text;
-		text.setCharacterSize(16);
-		text.setFont(font_);
 
 		for (const auto& node : nodesCached_)
 		{
@@ -89,7 +82,7 @@ namespace astar
 					line.setPosition(connection.end_->getPos().x, connection.end_->getPos().y);
 					rt.draw(line);
 				}
-			} //render lines
+			}
 		}
 
 		for (const auto& node : nodesCached_)
@@ -98,18 +91,20 @@ namespace astar
 
 			if (drawDistance_)
 			{
-				text.setPosition(node.getPos().x - 35.f, node.getPos().y + 32.f);
-				text.setString(std::to_string(node.getDistanceFromMouse(mousePos)));
-				text.setFillColor(sf::Color::White);
-				rt.draw(text);
+				text_.setPosition(node.getPos().x - 35.f, node.getPos().y + 32.f);
+				text_.setString(std::to_string(node.getDistanceFromMouse(mousePos)));
+				text_.setFillColor(sf::Color::White);
+				rt.draw(text_);
 			}
-			if (drawIds_) {
-				std::string test = std::to_string(node.id());
-				float width = test.size() * offset_ / 2.f;
-				text.setPosition(node.getPos().x - width, node.getPos().y - 8.f); //2.5
-				text.setString(std::to_string(node.id()));
-				text.setFillColor(sf::Color::Black);
-				rt.draw(text);
+
+			if (drawIds_) 
+			{
+				const std::string nodeId = std::to_string(node.id());
+				const float width = nodeId.size() * offset_ / 2.f;
+				text_.setPosition(node.getPos().x - width, node.getPos().y - 8.f);
+				text_.setString(nodeId);
+				text_.setFillColor(sf::Color::Black);
+				rt.draw(text_);
 			}
 		}
 	}
@@ -126,7 +121,8 @@ namespace astar
 		}
 	}
 
-	void Graph::clearSavedNode() {
+	void Graph::clearSavedNode() 
+	{
 		savedNode_ = nullptr;
 	}
 
@@ -171,7 +167,8 @@ namespace astar
 				{
 					endTarget_ = nullptr;
 				}
-				std::erase_if(nodesCached_, [addr = &nd](const Node& node) { return &node == addr; });
+
+				std::erase_if(nodesCached_, [&nd](const Node& node) { return &node == &nd; });
 
 				break;
 			}
@@ -188,7 +185,7 @@ namespace astar
 		drawIds_ = drawIds;
 	}
 
-	Node* Graph::checkMouseOnSomething(sf::Vector2f mousePos)
+	Node* Graph::checkMouseOnSomething(const sf::Vector2f& mousePos)
 	{
 		for (auto& node : nodesCached_) 
 		{
@@ -199,7 +196,7 @@ namespace astar
 		}
 		return nullptr;
 	}
-	void Graph::makeConnection(sf::Vector2f& mousePos)
+	void Graph::makeConnection(const sf::Vector2f& mousePos)
 	{
 		for (auto& node : nodesCached_)
 		{
@@ -251,10 +248,15 @@ namespace astar
 
 	}
 
-	Graph::Graph() : drawDistance_{ false }, savedNode_{}, nodesChanged_{}, freeInd_{}, shouldRecalculate_{}, offset_{10.f}
+	Graph::Graph() : drawDistance_{ false }, savedNode_{}, nodesChanged_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 10.f }, drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}
 	{
 		nodesCached_.reserve(1000);
-		std::cout << "Graph::Graph()\n";
+		std::cout << "Graph::Graph()" << '\n';
 		font_.loadFromFile("mono.ttf");
+		connectionText_.setFont(font_);
+		connectionText_.setString("Connection Mode: False");
+		connectionText_.setPosition(5, 15);
+		text_.setCharacterSize(16);
+		text_.setFont(font_);
 	}
 }

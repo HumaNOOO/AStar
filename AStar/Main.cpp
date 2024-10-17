@@ -1,8 +1,6 @@
-//test czy git działa
-
 #include <iostream>
 
-#include "Graph.hpp"
+#include "Console.hpp"
 
 
 int main()
@@ -12,7 +10,6 @@ int main()
 	cs.antialiasingLevel = 16;
 	sf::RenderWindow window(sf::VideoMode(1270, 768), "A*", sf::Style::Default, cs);
 	window.setVerticalSyncEnabled(true);
-	bool modeBuildConnection{ false };
 	bool movingNode{ false };
 	astar::Graph::getInstance().setDrawDistance(false);
 	astar::Graph::getInstance().setDrawIds(true);
@@ -45,42 +42,48 @@ int main()
 				window.close();
 				break;
 			case sf::Event::Resized:
-				window.setView(sf::View(sf::FloatRect(0, 0, event.size.width, event.size.height)));
+				window.setView(sf::View(sf::FloatRect(0, 0, static_cast<float>(event.size.width), static_cast<float>(event.size.height))));
 				break;
+			case sf::Event::TextEntered:
+				if (astar::Console::getInstance().isOpen())
+				{
+					astar::Console::getInstance().addChar(event.text.unicode);
+					astar::Console::getInstance().handleInput(event.key.code);
+				}
+			break;
 			case sf::Event::KeyPressed:
 				switch (event.key.code)
 				{
-				case sf::Keyboard::R:
-					astar::Graph::getInstance().resetNodes();
+				case sf::Keyboard::Tilde:
+					astar::Console::getInstance().toggle();
 					break;
 				case sf::Keyboard::Escape:
 					window.close();
 					break;
 				case sf::Keyboard::LShift:
-					modeBuildConnection = !modeBuildConnection;
 					astar::Graph::getInstance().clearSavedNode();
 					break;
 				case sf::Keyboard::Q:
 					astar::Graph::getInstance().selectNodes(mousePos);
 					break;
 				case sf::Keyboard::O:
-					astar::Graph::getInstance().increaseOffset(-1);
+					astar::Graph::getInstance().increaseOffset(1);
 					break;
 				case sf::Keyboard::P:
-					astar::Graph::getInstance().increaseOffset(1);
+					astar::Graph::getInstance().increaseOffset(-1);
 					break;
 				case sf::Keyboard::LAlt:
 					astar::Graph::getInstance().setCollision(mousePos);
 					break;
 				}
+				break;
 			case sf::Event::MouseButtonPressed:
 				switch (event.mouseButton.button)
 				{
 				case sf::Mouse::Left:
-					if (!modeBuildConnection)
+					if (!astar::Graph::getInstance().isBuildConnectionMode())
 					{
-						auto checkmouseup = astar::Graph::getInstance().checkMouseOnSomething(mousePos);
-						if(checkmouseup)
+						if (astar::Graph::getInstance().checkMouseOnSomething(mousePos))
 						{
 							movingNode = true;
 						}
@@ -88,7 +91,6 @@ int main()
 						{
 							astar::Graph::getInstance().addNode(mousePos);
 						}
-						
 					}
 					else
 					{
@@ -103,7 +105,11 @@ int main()
 		}
 
 		window.clear();
-		astar::Graph::getInstance().draw(window, mousePos, modeBuildConnection);
+		astar::Graph::getInstance().draw(window, mousePos);
+		if (astar::Console::getInstance().isOpen())
+		{
+			astar::Console::getInstance().draw(window);
+		}
 		window.display();
 	}
 }
