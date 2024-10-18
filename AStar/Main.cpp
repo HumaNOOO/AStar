@@ -14,8 +14,8 @@ int main()
 	astar::Console::getInstance().resetCarriage({ 4, windowHeight - 20 });
 	window.setVerticalSyncEnabled(true);
 	bool movingNode{ false };
-	astar::Graph::getInstance().setDrawDistance(false);
 	astar::Graph::getInstance().setDrawIds(true);
+
 	while (window.isOpen())
 	{
 		sf::Event event;
@@ -49,6 +49,9 @@ int main()
 			case sf::Event::TextEntered:
 				if (astar::Console::getInstance().isOpen())
 				{
+#ifdef _DEBUG
+					std::cout << "key pressed: " << event.key.code << '\n';
+#endif
 					astar::Console::getInstance().addChar(event.text.unicode);
 					astar::Console::getInstance().handleInput(event.key.code);
 				}

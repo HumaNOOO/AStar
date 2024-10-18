@@ -16,9 +16,10 @@ namespace astar
 		void addNode(const sf::Vector2f& pos);
 		void draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos);
 		void checkAndDelete(const sf::Vector2f& mousePos);
-		void setDrawDistance(const bool shouldDraw);
+		void toggleDrawDistance();
 		void setCollision(const sf::Vector2f& mousePos);
 		void makeConnection(const sf::Vector2f& mousePos);
+		bool addIdConnection(const std::pair<int, int>& connection);
 		void resetNodes();
 		void deleteNode(const int id);
 		void update();
@@ -30,8 +31,12 @@ namespace astar
 		void selectNodes(const sf::Vector2f& mousePos);
 		bool isBuildConnectionMode() const;
 		void toggleConnectionMode();
+		const std::vector<std::pair<int, int>>& getConnectionsCRef() const;
 	private:
+		bool nodeWithIdExists(const int id) const;
+		bool connectionExists(const std::pair<int, int>& connection) const;
 		void handleRecalculate();
+		float getAngleDeg(const sf::Vector2f p1, const sf::Vector2f p2) const;
 		float offset_;
 		bool drawIds_;
 		Graph();

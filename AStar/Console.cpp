@@ -1,5 +1,6 @@
 #include "Console.hpp"
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 
 
@@ -13,15 +14,71 @@ namespace astar
 
 	Console::Console() : consoleOpen_{ false }, cursorPos_{ 1 }
 	{
-		std::cout << "Console::Console()\n";
 		callbacks_.emplace_back("reset", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().resetNodes(); }, false);
+		callbacks_.emplace_back("distance", [](std::optional<std::vector<std::string>> args) { astar::Graph::getInstance().toggleDrawDistance(); }, false);
 		callbacks_.emplace_back("conn", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().toggleConnectionMode(); }, false);
-		callbacks_.emplace_back("del", [](std::optional<std::vector<std::string>> args){
+		callbacks_.emplace_back("del", [](std::optional<std::vector<std::string>> args)
+		{
 			if (std::all_of(args->at(0).begin(), args->at(0).end(), [](const char c) {return std::isdigit(c); }))
 			{
+#ifdef _DEBUG
 				std::cout << "executing command: del " << std::stoi(args->at(0)) << '\n';
+#endif
 				astar::Graph::getInstance().deleteNode((std::stoi(args->at(0))));
 			}
+		}, true);
+		callbacks_.emplace_back("print", [this](std::optional<std::vector<std::string>> args) 
+		{ 
+				const auto& connections = astar::Graph::getInstance().getConnectionsCRef();
+
+				if (connections.empty())
+				{
+					history_.emplace_back("&&Gno connections to print");
+					return;
+				}
+
+				std::stringstream ss;
+				ss << "&&G" << connections.size() << " node connections:\n";
+				std::for_each(connections.begin(), connections.end(), [&ss](const std::pair<int, int>& connection)
+				{
+						ss << connection.first << "<->" << connection.second << '\n';
+				});
+				history_.emplace_back(ss.str());
+		}, false);
+		callbacks_.emplace_back("link", [this](std::optional<std::vector<std::string>> args)
+		{ 
+				std::vector<std::string>& argsRef = *args;
+				std::vector<long> ids;
+				ids.reserve(argsRef.size());
+
+				std::for_each(argsRef.begin(), argsRef.end(), [&argsRef, &ids](const std::string& str)
+				{
+					if (std::all_of(str.begin(), str.end(), [&ids](const char c){ return std::isdigit(c); }))
+					{
+						ids.push_back(std::stoi(str));
+					}
+				});
+
+				if (ids.size() < 2)
+				{
+					history_.emplace_back("&&Rincorrect number of arguments, need 2 or more!");
+					return;
+				}
+					
+				std::stringstream ss;
+				ss << "&&G";
+				for (int i = 1; i < ids.size(); i++)
+				{
+					if (astar::Graph::getInstance().addIdConnection({ ids[0], ids[i] }))
+					{
+						ss << "adding connection " << ids[0] << "<->" << ids[i] << '\n';
+					}
+				}
+				history_.emplace_back(ss.str());
+		}, true);
+		callbacks_.emplace_back("path", [](std::optional<std::vector<std::string>> args)
+		{
+				astar::Graph::getInstance().toggleConnectionMode();
 		}, true);
 		font_.loadFromFile("mono.ttf");
 		text_.setFont(font_);
@@ -33,7 +90,7 @@ namespace astar
 
 	void Console::handleInput(const sf::Keyboard::Key key)
 	{
-		if (key == sf::Keyboard::Tilde)
+		if (key == sf::Keyboard::Tilde && key != '6')
 		{
 			consoleOpen_ = !consoleOpen_;
 		}
@@ -42,8 +99,10 @@ namespace astar
 			executeCommand(currentText_);
 		}
 
+#ifdef _DEBUG
 		std::cout << "current text size: " << currentText_.size() << '\n';
 		std::cout << "keycode: " << key << '\n';
+#endif
 	}
 
 	void Console::toggle()
@@ -93,13 +152,8 @@ namespace astar
 			{
 				if (command[i] != ' ')
 				{
-					std::cout << "command[" << i << "] is: " << command[i] << " deleting\n";
 					command.erase(command.begin() + i + 1, command.end());
 					break;
-				}
-				else
-				{
-					std::cout << "command[" << i << "] is: " << command[i] << " not deleting\n";
 				}
 			}
 		}
@@ -115,8 +169,8 @@ namespace astar
 			{
 				split.push_back(command.substr(0, pos));
 				command.erase(0, pos + 1);
-				split.push_back(command);
 			}
+			split.push_back(command);
 		}
 		else
 		{
@@ -144,16 +198,25 @@ namespace astar
 				}
 				else
 				{
-					history_.push_back(split[0] + ' ' + split[1]);
-					std::get<1>(*pos)(std::vector{ split[1] });
+					std::stringstream ss;
+					ss << split[0] << ' ';
+					for (int i = 1; i < split.size(); i++)
+					{
+						ss << split[i] << ' ';
+					}
+
+					history_.push_back(ss.str());
+					std::get<1>(*pos)(std::vector(split.begin() + 1, split.end()));
 				}
 			}
 		}
 		else if(!currentText_.empty())
 		{
 			history_.push_back("&&R" + split[0] + " - unknown command!");
+#ifdef _DEBUG
 			std::cout << "history size: " << history_.size() << '\n';
 			std::cout << "current text size: " << currentText_.size() << '\n';
+#endif
 
 			if (history_.size() >= 40)
 			{
@@ -193,13 +256,28 @@ namespace astar
 					text_.setFillColor(sf::Color::Red);
 					cpy = rIter->substr(3);
 				}
+				else if (rIter->find("&&G") != std::string::npos)
+				{
+					text_.setFillColor(sf::Color::Green);
+					cpy = rIter->substr(3);
+				}
 				else
 				{
 					text_.setFillColor(sf::Color::White);
 					cpy = *rIter;
 				}
 
-				text_.setPosition(4, size.y - (textPos += 18));
+				const int newlines = std::count(cpy.begin(), cpy.end(), '\n');
+
+				if (newlines)
+				{
+					text_.setPosition(4, size.y - (textPos += (22 * (newlines))));
+				}
+				else
+				{
+					text_.setPosition(4, size.y - (textPos += 18));
+				}
+
 				text_.setString(cpy);
 				rt.draw(text_);
 			}
@@ -216,13 +294,17 @@ namespace astar
 			{
 				--cursorPos_;
 				carriage_.move(-carriageOffset_, 0);
+#ifdef _DEBUG
 				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << cursorPos_ << '\n';
+#endif
 			}
 			else if(!left && cursorPos_ <= currentText_.size())
 			{
 				++cursorPos_;
 				carriage_.move(carriageOffset_, 0);
+#ifdef _DEBUG
 				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << cursorPos_ << '\n';
+#endif
 			}
 		}
 	}

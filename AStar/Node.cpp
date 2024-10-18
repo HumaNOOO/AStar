@@ -14,7 +14,9 @@ namespace astar
 		circle_.setOutlineColor(sf::Color::Blue);
 		circle_.setOutlineThickness(border_);
 
+#ifdef _DEBUG
 		std::cout << std::format("Creating node at ({},{}) with id={}\n", x, y, id);
+#endif
 	}
 
 	void Node::changePos(const sf::Vector2f& mousepos)
@@ -72,7 +74,6 @@ namespace astar
 		{
 			id_ = other.id_;
 			circle_ = other.circle_;
-			std::cout << "Node::operator=(const Node& other) called\n";
 		}
 		return *this;
 	}
@@ -83,7 +84,6 @@ namespace astar
 		{
 			id_ = std::move(other.id_);
 			circle_ = std::move(other.circle_);
-			std::cout << "Node::operator=(Node&& other) called\n";
 		}
 		return *this;
 	}
