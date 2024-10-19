@@ -3,6 +3,7 @@
 #include <iostream>
 #include "Timer.hpp"
 
+
 namespace
 {
 	bool operator==(const std::pair<int, int>& conn1, const std::pair<int, int>& conn2)
@@ -316,12 +317,12 @@ namespace astar
 
 	bool Graph::nodeWithIdExists(const int id) const
 	{
-		return std::find_if(nodesCached_.begin(), nodesCached_.end(), [&id](const Node& node) { return node.id() == id; }) != nodesCached_.end();
+		return std::ranges::find_if(nodesCached_, [&id](const Node& node) { return node.id() == id; }) != nodesCached_.end();
 	}
 
 	bool Graph::connectionExists(const std::pair<int, int>& connection) const
 	{
-		return !std::none_of(connections_.begin(), connections_.end(), [&connection](const std::pair<int, int>& conn)
+		return !std::ranges::none_of(connections_, [&connection](const std::pair<int, int>& conn)
 			{
 				return conn == connection;
 			});

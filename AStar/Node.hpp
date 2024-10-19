@@ -8,10 +8,10 @@ namespace astar
 	class Node
 	{
 	public:
-		Node() = default;
+		Node();
 		Node(const float x, const float y, const long id);
 		Node(const Node& other) = default;
-		const sf::Vector2f& getPos() const;
+		sf::Vector2f getPos() const;
 		bool isMouseOver(const sf::Vector2f& mousePos) const;
 		float getDistanceFromMouse(const sf::Vector2f mousePos) const;
 		long id() const;

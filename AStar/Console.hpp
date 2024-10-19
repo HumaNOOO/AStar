@@ -33,7 +33,7 @@ namespace astar
 		constexpr static int carriageOffset_{ 10 };
 		void executeCommand(std::string& command);
 		bool consoleOpen_;
-		size_t cursorPos_;
+		size_t carriagePos_;
 		sf::RectangleShape carriage_;
 		std::string currentText_;
 		std::vector<Command> callbacks_;

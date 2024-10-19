@@ -2,6 +2,7 @@
 
 #include <vector>
 #include "Node.hpp"
+#include <ranges>
 
 
 namespace astar

@@ -3,9 +3,8 @@
 namespace astar 
 {
 	class Node;
-	class Connection
+	struct Connection
 	{
-	public:
 		Node* end_;
 		unsigned int cost_;
 		bool render_;

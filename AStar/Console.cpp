@@ -12,9 +12,10 @@ namespace astar
 		return console;
 	}
 
-	Console::Console() : consoleOpen_{ false }, cursorPos_{ 1 }
+	Console::Console() : consoleOpen_{ false }, carriagePos_{ 1 }
 	{
 		callbacks_.emplace_back("reset", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().resetNodes(); }, false);
+		callbacks_.emplace_back("clear", [this](std::optional<std::vector<std::string>> args) { history_.clear(); }, false);
 		callbacks_.emplace_back("distance", [](std::optional<std::vector<std::string>> args) { astar::Graph::getInstance().toggleDrawDistance(); }, false);
 		callbacks_.emplace_back("conn", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().toggleConnectionMode(); }, false);
 		callbacks_.emplace_back("del", [](std::optional<std::vector<std::string>> args)
@@ -42,7 +43,7 @@ namespace astar
 
 				std::stringstream ss;
 				ss << "&&G" << connections.size() << " node connections:\n";
-				std::for_each(connections.begin(), connections.end(), [&ss](const std::pair<int, int>& connection)
+				std::ranges::for_each(connections, [&ss](const std::pair<int, int>& connection)
 				{
 						ss << connection.first << "<->" << connection.second << '\n';
 				});
@@ -50,31 +51,36 @@ namespace astar
 		}, false);
 		callbacks_.emplace_back("link", [this](std::optional<std::vector<std::string>> args)
 		{ 
-				std::vector<std::string>& argsRef = *args;
+				const std::vector<std::string>& argsRef = *args;
 				std::vector<long> ids;
 				ids.reserve(argsRef.size());
 
-				std::for_each(argsRef.begin(), argsRef.end(), [&ids](const std::string& str)
-					{
-						try
-						{
-							ids.push_back(std::stoi(str));
-						}
-						catch (std::exception& e)
-						{
-#ifdef _DEBUG
-							std::cout << "can't convert " << str << " into a number: " << e.what() << '\n';
-#endif
-						}
-					});
-
-				if (ids.size() < 2)
+				if (argsRef.size() < 2)
 				{
 					history_.emplace_back("&&Rincorrect number of arguments, need 2 or more!");
 					return;
 				}
-					
+
 				std::stringstream ss;
+				ss << "&&R";
+				for (const auto& str : argsRef)
+				{
+					try
+					{
+						ids.push_back(std::stoi(str));
+					}
+					catch (const std::exception& e)
+					{
+						ss << "can't convert '" << str << "' into a number: " << e.what() << '\n';
+					}
+				}
+					
+				if (ss.str().size() > 3)
+				{
+					history_.emplace_back(ss.str());
+				}
+
+				ss.str("");
 				ss << "&&G";
 				for (int i = 1; i < ids.size(); i++)
 				{
@@ -87,12 +93,12 @@ namespace astar
 		}, true);
 		callbacks_.emplace_back("path", [](std::optional<std::vector<std::string>> args)
 		{
-				astar::Graph::getInstance().toggleConnectionMode();
+				return;
 		}, true);
 		font_.loadFromFile("mono.ttf");
 		text_.setFont(font_);
 		text_.setCharacterSize(16);
-		history_.reserve(20);
+		history_.reserve(100);
 		carriage_.setFillColor(sf::Color::White);
 		carriage_.setSize({ 1, 16 });
 	}
@@ -106,6 +112,14 @@ namespace astar
 		else if (key == 13 && !currentText_.empty())
 		{
 			executeCommand(currentText_);
+		}
+		else if (key == sf::Keyboard::Left)
+		{
+			moveCarriage(true);
+		}
+		else if (key == sf::Keyboard::Right)
+		{
+			moveCarriage(false);
 		}
 
 #ifdef _DEBUG
@@ -124,16 +138,14 @@ namespace astar
 		if (c != 8 && c != '`' && c != 13)
 		{
 			currentText_ += c;
-			carriage_.move(carriageOffset_, 0);
-			++cursorPos_;
+			moveCarriage(false);
 		}
 		else if(c == 8)
 		{
-			if (!currentText_.empty() && cursorPos_ > 1)
+			if (!currentText_.empty() && carriagePos_ > 1)
 			{
+				moveCarriage(true);
 				currentText_.pop_back();
-				carriage_.move(-carriageOffset_, 0);
-				--cursorPos_;
 			}
 		}
 	}
@@ -147,7 +159,7 @@ namespace astar
 	{
 		if (command[0] == ' ')
 		{
-			auto found_l = std::find_if(command.begin(), command.end(), [](const char c) { return c != ' '; });
+			auto found_l = std::ranges::find_if(command, [](const char c) { return c != ' '; });
 
 			if (found_l != command.end())
 			{
@@ -170,9 +182,8 @@ namespace astar
 		std::vector<std::string> split;
 		split.reserve(2);
 		size_t pos = 0;
-		std::string token;
-
-		if (std::count(command.begin(), command.end(), ' ') > 0)
+		
+		if (std::ranges::count(command, ' ') > 0)
 		{
 			while ((pos = command.find(' ')) != std::string::npos)
 			{
@@ -187,7 +198,7 @@ namespace astar
 		}
 
 
-		if (const auto& pos = std::find_if(callbacks_.begin(), callbacks_.end(), [command = split[0]](const Command& cmd) { return std::get<0>(cmd) == command; }); pos != callbacks_.end())
+		if (const auto& pos = std::ranges::find_if(callbacks_, [&command = split[0]](const Command& cmd) { return std::get<0>(cmd) == command; }); pos != callbacks_.end())
 		{
 			if (!std::get<2>(*pos))
 			{
@@ -234,6 +245,7 @@ namespace astar
 		}
 
 		currentText_.clear();
+		carriagePos_ = 1;
 		carriage_.setPosition(4, carriage_.getPosition().y);
 	}
 
@@ -299,20 +311,20 @@ namespace astar
 	{
 		if (!currentText_.empty())
 		{
-			if (left && cursorPos_ > 1)
+			if (left && carriagePos_ > 1)
 			{
-				--cursorPos_;
+				--carriagePos_;
 				carriage_.move(-carriageOffset_, 0);
 #ifdef _DEBUG
-				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << cursorPos_ << '\n';
+				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << carriagePos_ << '\n';
 #endif
 			}
-			else if(!left && cursorPos_ <= currentText_.size())
+			else if(!left && carriagePos_ <= currentText_.size())
 			{
-				++cursorPos_;
+				++carriagePos_;
 				carriage_.move(carriageOffset_, 0);
 #ifdef _DEBUG
-				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << cursorPos_ << '\n';
+				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << carriagePos_ << '\n';
 #endif
 			}
 		}

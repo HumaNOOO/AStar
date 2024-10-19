@@ -5,6 +5,10 @@
 
 namespace astar
 {
+	Node::Node() : id_{}, isCollision_{}
+	{
+	}
+
 	Node::Node(const float x, const float y, const long id) : isCollision_{}, connections_{}, id_{ id }
 	{
 		circle_.setPosition(x, y);
@@ -24,7 +28,7 @@ namespace astar
 		circle_.setPosition(mousepos.x, mousepos.y);
 	}
 
-	const sf::Vector2f& Node::getPos() const
+	sf::Vector2f Node::getPos() const
 	{
 		return circle_.getPosition();
 	}

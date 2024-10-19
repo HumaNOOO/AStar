@@ -25,7 +25,7 @@ int main()
 		{
 			if (movingNode)
 			{
-				if(event.type==10)
+				if (event.type == sf::Event::MouseButtonReleased)
 				{
 					movingNode = false;
 					astar::Graph::getInstance().clearSavedNode();
