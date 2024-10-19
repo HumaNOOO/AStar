@@ -13,8 +13,9 @@ namespace astar
 		void operator=(const Graph&) = delete;
 		Graph(const Graph&) = delete;
 		static Graph& getInstance();
+		void resetIndex();
 		void addNode(const float x, const float y);
-		void addNode(const sf::Vector2f& pos);
+		void addNode(const sf::Vector2f& pos, const int id = -1);
 		void draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos);
 		void checkAndDelete(const sf::Vector2f& mousePos);
 		void toggleDrawDistance();

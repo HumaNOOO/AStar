@@ -1,7 +1,9 @@
 #include "Console.hpp"
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <algorithm>
+#include <format>
 
 
 namespace astar
@@ -95,6 +97,83 @@ namespace astar
 		{
 				return;
 		}, true);
+		callbacks_.emplace_back("load", [this](std::optional<std::vector<std::string>> args)
+			{ 
+				std::fstream file;
+				file.open(args->at(0), std::ios::in);
+
+				if (!file.is_open())
+				{
+					history_.emplace_back("&&Rcan't open file '" + args->at(0) + "'!\n");
+					return;
+				}
+
+				std::string line;
+				std::vector<std::tuple<float, float, int>> splitNodes;
+				std::vector<std::string> splitPrepare;
+				std::size_t pos;
+
+				while (std::getline(file, line) && line != "\n")
+				{
+					splitPrepare.push_back(line);
+					std::cout << line << '\n';
+				}
+
+				for (auto& str : splitPrepare)
+				{
+					if (std::ranges::count(str, ';') != 2)
+					{
+						history_.emplace_back("&&Rill formed data '" + str + "'!\n");
+						file.close();
+						return;
+					}
+
+					int count{ 0 };
+					splitNodes.push_back({});
+					while ((pos = line.find(';')) != std::string::npos && count < 3)
+					{
+						auto& [x, y, id] = splitNodes.back();
+
+						try
+						{
+							if (count == 0)
+							{
+								x = std::stof(str.substr(0, pos));
+							}
+							else if (count == 1)
+							{
+								y = std::stof(str.substr(0, pos));
+							}
+							else
+							{
+								id = std::stoi(str.substr(0, pos));
+							}
+							str.erase(0, pos + 1);
+							++count;
+						}
+						catch (const std::exception& e)
+						{
+							history_.emplace_back("&&Rbad data - " + std::string(e.what()) + '\n');
+							file.close();
+							return;
+						}
+					}
+				}
+
+				astar::Graph::getInstance().resetNodes();
+
+				for (const auto& [x, y, id] : splitNodes)
+				{
+#ifdef _DEBUG
+					std::cout << std::format("{}, {}, {}\n", x, y, id);
+#endif
+					astar::Graph::getInstance().addNode({ x,y }, id);
+				}
+
+				astar::Graph::getInstance().resetIndex();
+
+				file.close();
+			}, true);
 		font_.loadFromFile("mono.ttf");
 		text_.setFont(font_);
 		text_.setCharacterSize(16);

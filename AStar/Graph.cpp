@@ -20,14 +20,25 @@ namespace astar
 		return graph;
 	}
 
+	void Graph::resetIndex()
+	{
+		long maxId = nodesCached_.front().id();
+		for (const auto& node : nodesCached_)
+		{
+			maxId = maxId < node.id() ? node.id() : maxId;
+		}
+
+		freeInd_ = maxId;
+	}
+
 	void Graph::addNode(const float x, const float y)
 	{
 		nodesCached_.emplace_back(x, y, freeInd_++);
 	}
 
-	void Graph::addNode(const sf::Vector2f& pos)
+	void Graph::addNode(const sf::Vector2f& pos, const int id)
 	{
-		nodesCached_.emplace_back(pos.x, pos.y, freeInd_++);
+		nodesCached_.emplace_back(pos.x, pos.y, id == -1 ? ++freeInd_ : id);
 	}
 
 	void Graph::increaseOffset(const float offset)
