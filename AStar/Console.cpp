@@ -6,6 +6,20 @@
 #include <format>
 
 
+namespace
+{
+	void splitString(std::vector<std::string>& vec, std::string str, const char delim)
+	{
+		size_t pos;
+		while ((pos = str.find(delim) != std::string::npos))
+		{
+			vec.emplace_back(str.substr(0, pos));
+			str.erase(0, pos + 1);
+		}
+		vec.emplace_back(str);
+	}
+}
+
 namespace astar
 {
 	Console& Console::getInstance()
@@ -98,7 +112,7 @@ namespace astar
 				return;
 		}, true);
 		callbacks_.emplace_back("load", [this](std::optional<std::vector<std::string>> args)
-			{ 
+			{
 				std::fstream file;
 				file.open(args->at(0), std::ios::in);
 
@@ -110,27 +124,44 @@ namespace astar
 
 				std::string line;
 				std::vector<std::tuple<float, float, int>> splitNodes;
-				std::vector<std::string> splitPrepare;
-				std::size_t pos;
+				std::vector<std::tuple<int, int>> splitConnections;
+				std::vector<std::string> splitPrepareNodes;
+				std::vector<std::string> splitPrepareConnections;
 
+				bool readingNodes{ true };
 				while (std::getline(file, line) && line != "\n")
 				{
-					splitPrepare.push_back(line);
+					if (line == "#connections")
+					{
+						readingNodes = false;
+						continue;
+					}
+
+					if (readingNodes)
+					{
+						splitPrepareNodes.push_back(line);
+					}
+					else
+					{
+						splitPrepareConnections.push_back(line);
+					}
+#ifdef _DEBUG
 					std::cout << line << '\n';
+#endif
 				}
 
-				for (auto& str : splitPrepare)
+				for (auto& str : splitPrepareNodes)
 				{
 					if (std::ranges::count(str, ';') != 2)
 					{
 						history_.emplace_back("&&Rill formed data '" + str + "'!\n");
-						file.close();
 						return;
 					}
 
+					size_t pos;
 					int count{ 0 };
 					splitNodes.push_back({});
-					while ((pos = line.find(';')) != std::string::npos && count < 3)
+					while ((pos = str.find(';')) != std::string::npos && count < 3)
 					{
 						auto& [x, y, id] = splitNodes.back();
 
@@ -144,17 +175,17 @@ namespace astar
 							{
 								y = std::stof(str.substr(0, pos));
 							}
-							else
-							{
-								id = std::stoi(str.substr(0, pos));
-							}
 							str.erase(0, pos + 1);
 							++count;
+
+							if (count == 2)
+							{
+								id = std::stoi(str);
+							}
 						}
 						catch (const std::exception& e)
 						{
 							history_.emplace_back("&&Rbad data - " + std::string(e.what()) + '\n');
-							file.close();
 							return;
 						}
 					}
@@ -172,7 +203,45 @@ namespace astar
 
 				astar::Graph::getInstance().resetIndex();
 
-				file.close();
+				std::stringstream ss;
+				ss << "&&G";
+
+				for (const auto& str : splitPrepareConnections)
+				{
+					std::vector<std::string> connectionPrepare;
+					splitString(connectionPrepare, str, ';');
+
+					if (connectionPrepare.size() < 2)
+					{
+						history_.emplace_back("&&Rtoo few arguments");
+						return;
+					}
+
+					std::vector<int> connection;
+
+					try
+					{
+						for (const std::string& conn : connectionPrepare)
+						{
+							connection.emplace_back(std::stoi(conn));
+						}
+
+						for (int i = 1; i < connection.size(); i++)
+						{
+							if (astar::Graph::getInstance().addIdConnection({ connection[0], connection[i] }))
+							{
+								ss << "adding connection " << connection[0] << "<->" << connection[i] << '\n';
+							}
+						}
+					}
+					catch (const std::exception& e)
+					{
+						history_.emplace_back("&&Rbad data - " + std::string(e.what()) + '\n');
+						return;
+					}
+				}
+
+				history_.emplace_back(ss.str());
 			}, true);
 		font_.loadFromFile("mono.ttf");
 		text_.setFont(font_);
