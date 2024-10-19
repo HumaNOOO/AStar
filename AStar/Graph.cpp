@@ -81,8 +81,6 @@ namespace astar
 
 		rt.draw(connectionText_);
 
-		sf::CircleShape circle(Node::radius_);
-
 		for (const auto& node : nodesCached_)
 		{
 			for (const auto& connection : node.connections_)
@@ -90,11 +88,10 @@ namespace astar
 				if (connection.render_)
 				{
 					const float distance = std::sqrtf(std::fabs(std::powf(node.getPos().x - connection.end_->getPos().x, 2) + std::powf(node.getPos().y - connection.end_->getPos().y, 2)));
-					const float angle = getAngleDeg(node.getPos(), connection.end_->getPos());
 					sf::RectangleShape line(sf::Vector2f(distance, 5));
-					line.setRotation(angle);
+					line.setRotation(getAngleDeg(node.getPos(), connection.end_->getPos()));
 					line.setOrigin(0, 2.5);
-					line.setPosition(connection.end_->getPos().x, connection.end_->getPos().y);
+					line.setPosition(connection.end_->getPos());
 					rt.draw(line);
 				}
 			}
@@ -102,12 +99,9 @@ namespace astar
 
 		if (savedNode_)
 		{
-			const float angle = getAngleDeg(mousePos, savedNode_->getPos());
-			const float distance = savedNode_->getDistanceFromMouse(mousePos);
-
-			sf::RectangleShape rect({ distance, 5 });
+			sf::RectangleShape rect({ savedNode_->getDistanceFromMouse(mousePos), 5 });
 			rect.setOrigin(0, 2.5);
-			rect.setRotation(angle);
+			rect.setRotation(getAngleDeg(mousePos, savedNode_->getPos()));
 			rect.setPosition(savedNode_->getPos());
 			rt.draw(rect);
 		}
@@ -155,7 +149,7 @@ namespace astar
 
 	void Graph::moveNode(const sf::Vector2f mousePos)
 	{
-		Node* checkMouseUp = astar::Graph::getInstance().checkMouseOnSomething(mousePos);
+		Node* checkMouseUp = checkMouseOnSomething(mousePos);
 		if (checkMouseUp && !savedNode_)
 		{
 			checkMouseUp->changePos(mousePos);
@@ -174,7 +168,7 @@ namespace astar
 			if (nd.isMouseOver(mousePos))
 			{
 				std::erase_if(connections_, [&nd](const std::pair<int, int>& con) { return con.first == nd.id() || con.second == nd.id(); });
-				std::erase_if(nodesCached_, [&nd](Node& node) {return &node == &nd; });
+				std::erase_if(nodesCached_, [&nd](const Node& node) {return &node == &nd; });
 
 				if (&nd == startTarget_)
 				{
@@ -186,11 +180,6 @@ namespace astar
 				}
 				break;
 			}
-		}
-
-		for (auto& nd : nodesCached_)
-		{
-			nd.connections_.clear();
 		}
 
 		handleRecalculate();
@@ -272,24 +261,21 @@ namespace astar
 
 	bool Graph::addIdConnection(const std::pair<int, int>& connection)
 	{
-		if (nodeWithIdExists(connection.first) && nodeWithIdExists(connection.second))
+		if (!connectionExists(connection))
 		{
-			if (!connectionExists(connection))
-			{
-				connections_.push_back(connection);
+			connections_.push_back(connection);
 
-				for (Node& node_l : nodesCached_)
+			for (Node& node_l : nodesCached_)
+			{
+				if (node_l.id() == connection.first)
 				{
-					if (node_l.id() == connection.first)
+					for (Node& node_r : nodesCached_)
 					{
-						for (Node& node_r : nodesCached_)
+						if (node_r.id() == connection.second)
 						{
-							if (node_r.id() == connection.second)
-							{
-								node_l.connections_.emplace_back(&node_r, 1, true);
-								node_r.connections_.emplace_back(&node_l, 1, false);
-								return true;
-							}
+							node_l.connections_.emplace_back(&node_r, 1, true);
+							node_r.connections_.emplace_back(&node_l, 1, false);
+							return true;
 						}
 					}
 				}
@@ -320,11 +306,6 @@ namespace astar
 
 		std::erase_if(connections_, [id](const std::pair<int, int>& con) { return con.first == id || con.second == id; });
 
-		for (auto& nd : nodesCached_)
-		{
-			nd.connections_.clear();
-		}
-
 		handleRecalculate();
 	}
 
@@ -348,6 +329,11 @@ namespace astar
 
 	void Graph::handleRecalculate()
 	{
+		for (auto& nd : nodesCached_)
+		{
+			nd.connections_.clear();
+		}
+
 		for (const auto& [left, right] : connections_)
 		{
 			for (Node& node_l : nodesCached_)
@@ -369,7 +355,7 @@ namespace astar
 
 	float Graph::getAngleDeg(const sf::Vector2f p1, const sf::Vector2f p2) const
 	{
-		return std::atan2(p1.y - p2.y, p1.x - p2.x) * (180.f / 3.141f);
+		return std::atan2(p1.y - p2.y, p1.x - p2.x) * 57.30659025f;
 	}
 
 	Graph::Graph() : drawDistance_{ false }, savedNode_{}, nodesChanged_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 10.f }, drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}

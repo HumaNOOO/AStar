@@ -19,12 +19,15 @@ namespace astar
 		callbacks_.emplace_back("conn", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().toggleConnectionMode(); }, false);
 		callbacks_.emplace_back("del", [](std::optional<std::vector<std::string>> args)
 		{
-			if (std::all_of(args->at(0).begin(), args->at(0).end(), [](const char c) {return std::isdigit(c); }))
+			try
+			{
+				astar::Graph::getInstance().deleteNode((std::stoi(args->at(0))));
+			}
+			catch (std::exception& e)
 			{
 #ifdef _DEBUG
-				std::cout << "executing command: del " << std::stoi(args->at(0)) << '\n';
+				std::cout << "argument is not a number: " << e.what() << '\n';
 #endif
-				astar::Graph::getInstance().deleteNode((std::stoi(args->at(0))));
 			}
 		}, true);
 		callbacks_.emplace_back("print", [this](std::optional<std::vector<std::string>> args) 
@@ -51,13 +54,19 @@ namespace astar
 				std::vector<long> ids;
 				ids.reserve(argsRef.size());
 
-				std::for_each(argsRef.begin(), argsRef.end(), [&argsRef, &ids](const std::string& str)
-				{
-					if (std::all_of(str.begin(), str.end(), [&ids](const char c){ return std::isdigit(c); }))
+				std::for_each(argsRef.begin(), argsRef.end(), [&ids](const std::string& str)
 					{
-						ids.push_back(std::stoi(str));
-					}
-				});
+						try
+						{
+							ids.push_back(std::stoi(str));
+						}
+						catch (std::exception& e)
+						{
+#ifdef _DEBUG
+							std::cout << "can't convert " << str << " into a number: " << e.what() << '\n';
+#endif
+						}
+					});
 
 				if (ids.size() < 2)
 				{
