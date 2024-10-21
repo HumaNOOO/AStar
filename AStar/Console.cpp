@@ -4,25 +4,51 @@
 #include <fstream>
 #include <algorithm>
 #include <format>
+#include <filesystem>
 
 
 namespace
 {
-	void splitString(std::vector<std::string>& vec, std::string str, const char delim)
+	template<typename Type>
+	void splitString(std::vector<Type>& vec, std::string str, const char delim)
 	{
-		size_t pos;
-		while ((pos = str.find(delim) != std::string::npos))
+		if constexpr (std::is_same<Type, std::string>::value)
 		{
-			vec.emplace_back(str.substr(0, pos));
-			str.erase(0, pos + 1);
+			size_t pos;
+			while ((pos = str.find(delim)) != std::string::npos)
+			{
+				vec.emplace_back(str.substr(0, pos));
+				str.erase(0, pos + 1);
+			}
+			vec.emplace_back(str);
 		}
-		vec.emplace_back(str);
+		else if constexpr (std::is_same<Type, float>::value)
+		{
+			std::vector<Type> temp;
+
+			try
+			{
+				size_t pos;
+				while ((pos = str.find(delim)) != std::string::npos)
+				{
+					temp.emplace_back(std::stof(str.substr(0, pos)));
+					str.erase(0, pos + 1);
+				}
+				temp.emplace_back(std::stof(str));
+			}
+			catch (...)
+			{
+				return;
+			}
+
+			vec = std::move(temp);
+		}
 	}
 }
 
 namespace astar
 {
-	Console& Console::getInstance()
+	Console& Console::get()
 	{
 		static Console console;
 		return console;
@@ -30,26 +56,26 @@ namespace astar
 
 	Console::Console() : consoleOpen_{ false }, carriagePos_{ 1 }
 	{
-		callbacks_.emplace_back("reset", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().resetNodes(); }, false);
-		callbacks_.emplace_back("clear", [this](std::optional<std::vector<std::string>> args) { history_.clear(); }, false);
-		callbacks_.emplace_back("distance", [](std::optional<std::vector<std::string>> args) { astar::Graph::getInstance().toggleDrawDistance(); }, false);
-		callbacks_.emplace_back("conn", [](std::optional<std::vector<std::string>> args){ astar::Graph::getInstance().toggleConnectionMode(); }, false);
-		callbacks_.emplace_back("del", [](std::optional<std::vector<std::string>> args)
-		{
-			try
+		callbacks_.emplace_back("reset", [](const std::vector<std::string>& args) { astar::Graph::get().resetNodes(); }, false);
+		callbacks_.emplace_back("clear", [this](const std::vector<std::string>& args) { history_.clear(); }, false);
+		callbacks_.emplace_back("distance", [](const std::vector<std::string>& args) { astar::Graph::get().toggleDrawDistance(); }, false);
+		callbacks_.emplace_back("conn", [](const std::vector<std::string>& args) { astar::Graph::get().toggleConnectionMode(); }, false);
+		callbacks_.emplace_back("del", [](const std::vector<std::string>& args)
 			{
-				astar::Graph::getInstance().deleteNode((std::stoi(args->at(0))));
-			}
-			catch (std::exception& e)
-			{
+				try
+				{
+					astar::Graph::get().deleteNode((std::stoi(args[0])));
+				}
+				catch (const std::exception& e)
+				{
 #ifdef _DEBUG
-				std::cout << "argument is not a number: " << e.what() << '\n';
+					std::cout << "argument is not a number: " << e.what() << '\n';
 #endif
-			}
-		}, true);
-		callbacks_.emplace_back("print", [this](std::optional<std::vector<std::string>> args) 
-		{ 
-				const auto& connections = astar::Graph::getInstance().getConnectionsCRef();
+				}
+			}, true);
+		callbacks_.emplace_back("print", [this](const std::vector<std::string>& args)
+			{
+				const auto& connections = astar::Graph::get().getConnectionsCRef();
 
 				if (connections.empty())
 				{
@@ -60,18 +86,17 @@ namespace astar
 				std::stringstream ss;
 				ss << "&&G" << connections.size() << " node connections:\n";
 				std::ranges::for_each(connections, [&ss](const std::pair<int, int>& connection)
-				{
+					{
 						ss << connection.first << "<->" << connection.second << '\n';
-				});
+					});
 				history_.emplace_back(ss.str());
-		}, false);
-		callbacks_.emplace_back("link", [this](std::optional<std::vector<std::string>> args)
-		{ 
-				const std::vector<std::string>& argsRef = *args;
-				std::vector<long> ids;
-				ids.reserve(argsRef.size());
+			}, false);
+		callbacks_.emplace_back("link", [this](const std::vector<std::string>& args)
+			{
+				std::vector<int> ids;
+				ids.reserve(args.size());
 
-				if (argsRef.size() < 2)
+				if (args.size() < 2)
 				{
 					history_.emplace_back("&&Rincorrect number of arguments, need 2 or more!");
 					return;
@@ -79,7 +104,7 @@ namespace astar
 
 				std::stringstream ss;
 				ss << "&&R";
-				for (const auto& str : argsRef)
+				for (const auto& str : args)
 				{
 					try
 					{
@@ -90,7 +115,7 @@ namespace astar
 						ss << "can't convert '" << str << "' into a number: " << e.what() << '\n';
 					}
 				}
-					
+
 				if (ss.str().size() > 3)
 				{
 					history_.emplace_back(ss.str());
@@ -100,139 +125,130 @@ namespace astar
 				ss << "&&G";
 				for (int i = 1; i < ids.size(); i++)
 				{
-					if (astar::Graph::getInstance().addIdConnection({ ids[0], ids[i] }))
+					if (astar::Graph::get().addIdConnection({ ids[0], ids[i] }))
 					{
 						ss << "adding connection " << ids[0] << "<->" << ids[i] << '\n';
 					}
 				}
 				history_.emplace_back(ss.str());
-		}, true);
-		callbacks_.emplace_back("path", [](std::optional<std::vector<std::string>> args)
-		{
-				return;
-		}, true);
-		callbacks_.emplace_back("load", [this](std::optional<std::vector<std::string>> args)
+			}, true);
+		callbacks_.emplace_back("set", [this](const std::vector<std::string>& args)
+			{
+				if (args.size() < 2)
+				{
+					history_.emplace_back("&&Rincorrect number of arguments, need 2!");
+					return;
+				}
+
+				if (args[0] == "start")
+				{
+					try
+					{
+						if (astar::Graph::get().setStart(std::stoi(args[1])))
+						{
+							history_.emplace_back("&&Gstart node id " + args[1]);
+						}
+						else
+						{
+							history_.emplace_back("&&Rnode with id " + args[1] + " doesn't exist!");
+						}
+					}
+					catch (const std::exception& e)
+					{
+						history_.emplace_back("&&Rcan't convert '" + args[1] + "' to a number: " + e.what());
+					}
+				}
+				else if (args[0] == "end")
+				{
+					try
+					{
+						if (astar::Graph::get().setEnd(std::stoi(args[1])))
+						{
+							history_.emplace_back("&&Gend node id " + args[1]);
+						}
+						else
+						{
+							history_.emplace_back("&&Rnode with id " + args[1] + " doesn't exist!");
+						}
+					}
+					catch (const std::exception& e)
+					{
+						history_.emplace_back("&&Rcan't convert '" + args[1] + "' to a number: " + e.what());
+					}
+				}
+				else
+				{
+					history_.emplace_back("&&Runknown parameter!");
+				}
+			}, true);
+		callbacks_.emplace_back("load", [this](const std::vector<std::string>& args)
 			{
 				std::fstream file;
-				file.open(args->at(0), std::ios::in);
+				file.open(args[0], std::ios::in);
 
 				if (!file.is_open())
 				{
-					history_.emplace_back("&&Rcan't open file '" + args->at(0) + "'!\n");
+					history_.emplace_back("&&Rcan't open file '" + args[0] + "'!\n");
 					return;
 				}
 
 				std::string line;
 				std::vector<std::tuple<float, float, int>> splitNodes;
-				std::vector<std::tuple<int, int>> splitConnections;
-				std::vector<std::string> splitPrepareNodes;
-				std::vector<std::string> splitPrepareConnections;
+				std::vector<std::string> stringsToSplit;
 
-				bool readingNodes{ true };
 				while (std::getline(file, line) && line != "\n")
 				{
-					if (line == "#connections")
-					{
-						readingNodes = false;
-						continue;
-					}
-
-					if (readingNodes)
-					{
-						splitPrepareNodes.push_back(line);
-					}
-					else
-					{
-						splitPrepareConnections.push_back(line);
-					}
+					stringsToSplit.push_back(line);
 #ifdef _DEBUG
 					std::cout << line << '\n';
 #endif
 				}
 
-				for (auto& str : splitPrepareNodes)
-				{
-					if (std::ranges::count(str, ';') != 2)
-					{
-						history_.emplace_back("&&Rill formed data '" + str + "'!\n");
-						return;
-					}
-
-					size_t pos;
-					int count{ 0 };
-					splitNodes.push_back({});
-					while ((pos = str.find(';')) != std::string::npos && count < 3)
-					{
-						auto& [x, y, id] = splitNodes.back();
-
-						try
-						{
-							if (count == 0)
-							{
-								x = std::stof(str.substr(0, pos));
-							}
-							else if (count == 1)
-							{
-								y = std::stof(str.substr(0, pos));
-							}
-							str.erase(0, pos + 1);
-							++count;
-
-							if (count == 2)
-							{
-								id = std::stoi(str);
-							}
-						}
-						catch (const std::exception& e)
-						{
-							history_.emplace_back("&&Rbad data - " + std::string(e.what()) + '\n');
-							return;
-						}
-					}
-				}
-
-				astar::Graph::getInstance().resetNodes();
-
-				for (const auto& [x, y, id] : splitNodes)
-				{
-#ifdef _DEBUG
-					std::cout << std::format("{}, {}, {}\n", x, y, id);
-#endif
-					astar::Graph::getInstance().addNode({ x,y }, id);
-				}
-
-				astar::Graph::getInstance().resetIndex();
-
 				std::stringstream ss;
 				ss << "&&G";
 
-				for (const auto& str : splitPrepareConnections)
-				{
-					std::vector<std::string> connectionPrepare;
-					splitString(connectionPrepare, str, ';');
+				astar::Graph::get().resetNodes();
+				std::vector<std::vector<float>> connectionsVec;
 
-					if (connectionPrepare.size() < 2)
+				int count{};
+				for (auto& str : stringsToSplit)
+				{
+					++count;
+					if (std::ranges::count(str, ',') != 3)
 					{
-						history_.emplace_back("&&Rtoo few arguments");
-						return;
+						history_.emplace_back("&&Rill formed data '" + str + "' - skipping\n");
+						continue;
 					}
 
-					std::vector<int> connection;
+					std::vector<std::string> split;
+					splitString(split, str, ',');
+
+					if (split.size() != 4)
+					{
+						history_.emplace_back(std::format("&&Rnumber of fields in '{}' at line number {} is wrong, expected 4 but got {} - skipping\n", str, count, split.size()));
+						continue;
+					}
+
+					std::vector<float> connections;
+					splitString(connections, split.back(), ':');
+
+					if (connections.empty())
+					{
+						history_.emplace_back(std::format("&&Rbad argument in '{}' at line number {}  - skipping\n", str, count));
+						continue;
+					}
+					else if (connections.size() < 2)
+					{
+						history_.emplace_back("&&Rneed 2 or more ids for connections - skipping\n");
+						continue;
+					}
+
+					split.pop_back();
+					connectionsVec.push_back(std::move(connections));
 
 					try
 					{
-						for (const std::string& conn : connectionPrepare)
-						{
-							connection.emplace_back(std::stoi(conn));
-						}
-
-						for (int i = 1; i < connection.size(); i++)
-						{
-							if (astar::Graph::getInstance().addIdConnection({ connection[0], connection[i] }))
-							{
-								ss << "adding connection " << connection[0] << "<->" << connection[i] << '\n';
-							}
-						}
+						splitNodes.push_back({ std::stof(split[0]), std::stof(split[1]), std::stof(split[2]) });
 					}
 					catch (const std::exception& e)
 					{
@@ -241,6 +257,80 @@ namespace astar
 					}
 				}
 
+				for (const auto& [x, y, id] : splitNodes)
+				{
+					if (astar::Graph::get().addNode({ x,y }, id))
+					{
+#ifdef _DEBUG
+						std::cout << std::format("read node data (x, y, id): ({}, {}, {})\n", x, y, id);
+#endif
+						ss << std::format("adding node at ({},{}) with id {}\n", x, y, id);
+					}
+					else
+					{
+						ss << std::format("node with id {} already exists - skipping\n", id);
+					}
+				}
+
+				for (const auto& connection : connectionsVec)
+				{
+					for (int i = 1; i < connection.size(); i++)
+					{
+						if (astar::Graph::get().addIdConnection({ connection[0], connection[i] }))
+						{
+							ss << "adding connection " << connection[0] << "<->" << connection[i] << '\n';
+						}
+						else
+						{
+							ss << std::format("connection {}<->{} already exists - skipping\n", connection[0], connection[i]);
+						}
+					}
+				}
+
+				astar::Graph::get().resetIndex();
+
+				history_.emplace_back(ss.str());
+			}, true);
+		callbacks_.emplace_back("save", [this](const std::vector<std::string>& args)
+			{
+				std::fstream file;
+				file.open(args[0], std::ios::out);
+				const std::vector<Node>& nodesRef = astar::Graph::get().getNodesCRef();
+
+				if (!file.is_open())
+				{
+					history_.emplace_back("&&Rcan't open file '" + args[0] + "'!\n");
+					return;
+				}
+				else if (nodesRef.empty())
+				{
+					file.close();
+					history_.emplace_back("&&Rno nodes to save!\n");
+					std::filesystem::remove(std::filesystem::path(args[0]));
+					return;
+				}
+				
+				std::stringstream ss;
+				ss << "&&G";
+
+				for (const Node& node : nodesRef)
+				{
+					std::string connections;
+
+					connections += (std::to_string(node.id()) + ':');
+
+					for (const Node* conn : node.connections_)
+					{
+						connections += (std::to_string(conn->id()) + ':');
+					}
+					connections.erase(connections.end() - 1);
+
+					file << std::format("{},{},{},{}\n", node.getPos().x, node.getPos().y, node.id(), connections);
+
+					ss << std::format("saving {},{},{},{}\n", node.getPos().x, node.getPos().y, node.id(), connections);
+				}
+
+				ss << "graph saved to file '" << args[0] << "'!\n";
 				history_.emplace_back(ss.str());
 			}, true);
 		font_.loadFromFile("mono.ttf");
@@ -288,7 +378,7 @@ namespace astar
 			currentText_ += c;
 			moveCarriage(false);
 		}
-		else if(c == 8)
+		else if (c == 8)
 		{
 			if (!currentText_.empty() && carriagePos_ > 1)
 			{
@@ -329,10 +419,10 @@ namespace astar
 
 		std::vector<std::string> split;
 		split.reserve(2);
-		size_t pos = 0;
-		
+
 		if (std::ranges::count(command, ' ') > 0)
 		{
+			size_t pos = 0;
 			while ((pos = command.find(' ')) != std::string::npos)
 			{
 				split.push_back(command.substr(0, pos));
@@ -351,7 +441,7 @@ namespace astar
 			if (!std::get<2>(*pos))
 			{
 				history_.push_back(split[0]);
-				std::get<1>(*pos)(std::nullopt);
+				std::get<1>(*pos)({});
 			}
 			else
 			{
@@ -378,7 +468,7 @@ namespace astar
 				}
 			}
 		}
-		else if(!currentText_.empty())
+		else if (!currentText_.empty())
 		{
 			history_.push_back("&&R" + split[0] + " - unknown command!");
 #ifdef _DEBUG
@@ -409,7 +499,7 @@ namespace astar
 			const auto& size = rt.getSize();
 
 			sf::RectangleShape rect(sf::Vector2f{ size });
-			rect.setFillColor(sf::Color(0, 0, 0, 175));
+			rect.setFillColor(sf::Color(0, 0, 0, 220));
 			text_.setString(currentText_);
 			text_.setFillColor(sf::Color::White);
 			text_.setPosition(4, size.y - 22);
@@ -467,7 +557,7 @@ namespace astar
 				std::cout << "carriage x: " << carriage_.getPosition().x << ", pos: " << carriagePos_ << '\n';
 #endif
 			}
-			else if(!left && carriagePos_ <= currentText_.size())
+			else if (!left && carriagePos_ <= currentText_.size())
 			{
 				++carriagePos_;
 				carriage_.move(carriageOffset_, 0);

@@ -9,7 +9,7 @@ namespace astar
 	{
 	}
 
-	Node::Node(const float x, const float y, const long id) : isCollision_{}, connections_{}, id_{ id }
+	Node::Node(const float x, const float y, const int id) : isCollision_{}, connections_{}, id_{ id }
 	{
 		circle_.setPosition(x, y);
 		circle_.setRadius(radius_);
@@ -23,9 +23,9 @@ namespace astar
 #endif
 	}
 
-	void Node::changePos(const sf::Vector2f& mousepos)
+	void Node::changePos(const sf::Vector2f& mousePos)
 	{
-		circle_.setPosition(mousepos.x, mousepos.y);
+		circle_.setPosition(mousePos.x, mousePos.y);
 	}
 
 	sf::Vector2f Node::getPos() const
@@ -35,15 +35,15 @@ namespace astar
 
 	bool Node::isMouseOver(const sf::Vector2f& mousePos) const
 	{
-		return std::sqrtf(std::fabs(std::powf(mousePos.x - circle_.getPosition().x, 2) + std::powf(mousePos.y - circle_.getPosition().y, 2))) < (radius_ + border_);
+		return std::sqrtf(std::powf(mousePos.x - circle_.getPosition().x, 2) + std::powf(mousePos.y - circle_.getPosition().y, 2)) < (radius_ + border_);
 	}
 
 	float Node::getDistanceFromMouse(const sf::Vector2f mousePos) const
 	{
-		return std::sqrtf(std::fabs(std::powf(mousePos.x - circle_.getPosition().x, 2) + std::powf(mousePos.y - circle_.getPosition().y, 2)));
+		return std::sqrtf(std::powf(mousePos.x - circle_.getPosition().x, 2) + std::powf(mousePos.y - circle_.getPosition().y, 2));
 	}
 
-	long Node::id() const
+	int Node::id() const
 	{
 		return id_;
 	}
@@ -77,6 +77,8 @@ namespace astar
 		if (this != &other)
 		{
 			id_ = other.id_;
+			connections_ = other.connections_;
+			isCollision_ = other.isCollision_;
 			circle_ = other.circle_;
 		}
 		return *this;
@@ -87,6 +89,8 @@ namespace astar
 		if (this != &other)
 		{
 			id_ = std::move(other.id_);
+			connections_ = std::move(other.connections_);
+			isCollision_ = std::move(other.isCollision_);
 			circle_ = std::move(other.circle_);
 		}
 		return *this;

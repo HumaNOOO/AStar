@@ -12,10 +12,9 @@ namespace astar
 	public:
 		void operator=(const Graph&) = delete;
 		Graph(const Graph&) = delete;
-		static Graph& getInstance();
+		static Graph& get();
 		void resetIndex();
-		void addNode(const float x, const float y);
-		void addNode(const sf::Vector2f& pos, const int id = -1);
+		bool addNode(const sf::Vector2f& pos, const int id = -1);
 		void draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos);
 		void checkAndDelete(const sf::Vector2f& mousePos);
 		void toggleDrawDistance();
@@ -24,7 +23,6 @@ namespace astar
 		bool addIdConnection(const std::pair<int, int>& connection);
 		void resetNodes();
 		void deleteNode(const int id);
-		void update();
 		void increaseOffset(const float offset);
 		Node* checkMouseOnSomething(const sf::Vector2f& mousePos);
 		void moveNode(sf::Vector2f mousePos);
@@ -33,23 +31,25 @@ namespace astar
 		void selectNodes(const sf::Vector2f& mousePos);
 		bool isBuildConnectionMode() const;
 		void toggleConnectionMode();
+		bool setStart(const int id);
+		bool setEnd(const int id);
 		const std::vector<std::pair<int, int>>& getConnectionsCRef() const;
+		const std::vector<Node>& getNodesCRef() const;
 	private:
 		bool nodeWithIdExists(const int id) const;
 		bool connectionExists(const std::pair<int, int>& connection) const;
 		void handleRecalculate();
-		float getAngleDeg(const sf::Vector2f p1, const sf::Vector2f p2) const;
 		float offset_;
 		bool drawIds_;
 		Graph();
 		Node* savedNode_; //Saved Node to make Connections between
 		std::vector<Node> nodesCached_;
+		std::vector<Connection> connectionsCached_;
 		sf::Font font_;
 		sf::Text connectionText_;
 		sf::Text text_;
 		bool drawDistance_;
-		bool nodesChanged_;
-		long freeInd_;
+		int freeInd_;
 		bool shouldRecalculate_;
 		bool buildConnectionMode_;
 		Node* startTarget_;

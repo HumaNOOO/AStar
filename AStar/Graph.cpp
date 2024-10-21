@@ -2,6 +2,7 @@
 #include "Connection.hpp"
 #include <iostream>
 #include "Timer.hpp"
+#include "Utils.hpp"
 
 
 namespace
@@ -14,7 +15,7 @@ namespace
 
 namespace astar
 {
-	Graph& Graph::getInstance()
+	Graph& Graph::get()
 	{
 		static Graph graph;
 		return graph;
@@ -22,7 +23,7 @@ namespace astar
 
 	void Graph::resetIndex()
 	{
-		long maxId = nodesCached_.front().id();
+		int maxId = nodesCached_.front().id();
 		for (const auto& node : nodesCached_)
 		{
 			maxId = maxId < node.id() ? node.id() : maxId;
@@ -31,14 +32,11 @@ namespace astar
 		freeInd_ = maxId;
 	}
 
-	void Graph::addNode(const float x, const float y)
+	bool Graph::addNode(const sf::Vector2f& pos, const int id)
 	{
-		nodesCached_.emplace_back(x, y, freeInd_++);
-	}
-
-	void Graph::addNode(const sf::Vector2f& pos, const int id)
-	{
+		if (nodeWithIdExists(id)) return false;
 		nodesCached_.emplace_back(pos.x, pos.y, id == -1 ? ++freeInd_ : id);
+		return true;
 	}
 
 	void Graph::increaseOffset(const float offset)
@@ -71,7 +69,59 @@ namespace astar
 
 	void Graph::toggleConnectionMode()
 	{
-		connectionText_.setString((buildConnectionMode_ = !buildConnectionMode_) ? "Connection Mode: True" : "Connection Mode: False");
+		connectionText_.setString((buildConnectionMode_ = !buildConnectionMode_) ? "Connection Mode: True\n" : "Connection Mode: False\n");
+	}
+
+	bool Graph::setStart(const int id)
+	{
+		for (auto& node : nodesCached_)
+		{
+			if (node.id() == id)
+			{
+				if (endTarget_ && endTarget_->id() != id)
+				{
+					startTarget_ = &node;
+					return true;
+				}
+				else if (!endTarget_)
+				{
+					startTarget_ = &node;
+					return true;
+				}
+				else
+				{
+					return false;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	bool Graph::setEnd(const int id)
+	{
+		for (auto& node : nodesCached_)
+		{
+			if (node.id() == id)
+			{
+				if (startTarget_ && startTarget_->id() != id)
+				{
+					endTarget_ = &node;
+					return true;
+				}
+				else if (!startTarget_)
+				{
+					endTarget_ = &node;
+					return true;
+				}
+				else
+				{
+					return false;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	const std::vector<std::pair<int, int>>& Graph::getConnectionsCRef() const
@@ -79,8 +129,15 @@ namespace astar
 		return connections_;
 	}
 
+	const std::vector<Node>& Graph::getNodesCRef() const
+	{
+		return nodesCached_;
+	}
+
 	void Graph::draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos)
 	{
+		connectionText_.setString(buildConnectionMode_ ? "Connection Mode: True\n" : "Connection Mode: False\n");
+
 		if (startTarget_)
 		{
 			connectionText_.setString(connectionText_.getString() + "\nStart Target: " + std::to_string(startTarget_->id()));
@@ -91,31 +148,18 @@ namespace astar
 			connectionText_.setString(connectionText_.getString() + "\nEnd Target: " + std::to_string(endTarget_->id()));
 		}
 
-		rt.draw(connectionText_);
-
-		for (const auto& node : nodesCached_)
-		{
-			for (const auto& connection : node.connections_)
-			{
-				if (connection.render_)
-				{
-					const float distance = std::sqrtf(std::fabs(std::powf(node.getPos().x - connection.end_->getPos().x, 2) + std::powf(node.getPos().y - connection.end_->getPos().y, 2)));
-					sf::RectangleShape line(sf::Vector2f(distance, 5));
-					line.setRotation(getAngleDeg(node.getPos(), connection.end_->getPos()));
-					line.setOrigin(0, 2.5);
-					line.setPosition(connection.end_->getPos());
-					rt.draw(line);
-				}
-			}
-		}
-
 		if (savedNode_)
 		{
 			sf::RectangleShape rect({ savedNode_->getDistanceFromMouse(mousePos), 5 });
 			rect.setOrigin(0, 2.5);
-			rect.setRotation(getAngleDeg(mousePos, savedNode_->getPos()));
+			rect.setRotation(utils::getAngleDeg(mousePos, savedNode_->getPos()));
 			rect.setPosition(savedNode_->getPos());
 			rt.draw(rect);
+		}
+
+		for (const auto& connection : connectionsCached_)
+		{
+			connection.draw(rt);
 		}
 
 		for (const auto& node : nodesCached_)
@@ -140,6 +184,9 @@ namespace astar
 				rt.draw(text_);
 			}
 		}
+
+		rt.draw(connectionText_);
+		connectionText_.setString("");
 	}
 
 	void Graph::setCollision(const sf::Vector2f& mousePos)
@@ -179,9 +226,6 @@ namespace astar
 		{
 			if (nd.isMouseOver(mousePos))
 			{
-				std::erase_if(connections_, [&nd](const std::pair<int, int>& con) { return con.first == nd.id() || con.second == nd.id(); });
-				std::erase_if(nodesCached_, [&nd](const Node& node) {return &node == &nd; });
-
 				if (&nd == startTarget_)
 				{
 					startTarget_ = nullptr;
@@ -190,11 +234,14 @@ namespace astar
 				{
 					endTarget_ = nullptr;
 				}
+
+				deleteNode(nd.id());
+				handleRecalculate();
+
 				break;
 			}
 		}
 
-		handleRecalculate();
 	}
 
 	void Graph::toggleDrawDistance()
@@ -227,34 +274,25 @@ namespace astar
 			{
 				if (savedNode_ && savedNode_ != &node)
 				{
-					for (const auto& connStart : savedNode_->connections_)
+					if (connectionExists({ savedNode_->id(), node.id() }))
 					{
-						if (savedNode_ == connStart.end_)
-						{
-							return;
-						}
+						return;
 					}
 
-					for (const auto& conn : node.connections_)
-					{
-						if (savedNode_ == conn.end_)
-						{
-							return;
-						}
-					}
-
-					savedNode_->connections_.emplace_back(&node, 1, true);
-					node.connections_.emplace_back(savedNode_, 1, false);
-
+					savedNode_->connections_.emplace_back(&node);
+					node.connections_.emplace_back(savedNode_);
 					connections_.emplace_back(savedNode_->id(), node.id());
 
-#ifdef _DEBUG
-					std::cout << savedNode_ << "->" << &node << '\n';
-					std::cout << &node << "->" << savedNode_ << '\n';
+					connectionsCached_.emplace_back(savedNode_,
+						&node,
+						1,
+						astar::utils::euclidDistance(savedNode_->getPos(), node.getPos()),
+						astar::utils::getAngleDeg(node.getPos(), savedNode_->getPos()));
 
+#ifdef _DEBUG
 					for (const auto& [left, right] : connections_)
 					{
-						std::cout << std::format("{}->{}\n", left, right);
+						std::cout << std::format("{}<->{}\n", left, right);
 					}
 					std::cout << "------------------------------\n";
 #endif
@@ -285,8 +323,16 @@ namespace astar
 					{
 						if (node_r.id() == connection.second)
 						{
-							node_l.connections_.emplace_back(&node_r, 1, true);
-							node_r.connections_.emplace_back(&node_l, 1, false);
+							node_l.connections_.emplace_back(&node_r);
+							node_r.connections_.emplace_back(&node_l);
+
+							connectionsCached_.emplace_back(
+								&node_r,
+								&node_l,
+								1,
+								utils::euclidDistance(node_l.getPos(), node_r.getPos()),
+								utils::getAngleDeg(node_l.getPos(), node_r.getPos()));
+
 							return true;
 						}
 					}
@@ -299,15 +345,19 @@ namespace astar
 
 	void Graph::resetNodes()
 	{
+		startTarget_ = nullptr;
+		endTarget_ = nullptr;
+		savedNode_ = nullptr;
 		nodesCached_.clear();
-
+		connectionsCached_.clear();
 		connections_.clear();
-
 		freeInd_ = 0;
 	}
 
 	void Graph::deleteNode(const int id)
 	{
+		std::erase_if(connectionsCached_, [id](const Connection& con) { return con.start_->id() == id || con.end_->id() == id; });
+
 		std::erase_if(nodesCached_, [id](const Node& node)
 			{
 #ifdef _DEBUG
@@ -319,11 +369,6 @@ namespace astar
 		std::erase_if(connections_, [id](const std::pair<int, int>& con) { return con.first == id || con.second == id; });
 
 		handleRecalculate();
-	}
-
-	void Graph::update()
-	{
-
 	}
 
 	bool Graph::nodeWithIdExists(const int id) const
@@ -356,8 +401,15 @@ namespace astar
 					{
 						if (node_r.id() == right)
 						{
-							node_l.connections_.emplace_back(&node_r, 1, true);
-							node_r.connections_.emplace_back(&node_l, 1, false);
+							node_l.connections_.emplace_back(&node_r);
+							node_r.connections_.emplace_back(&node_l);
+
+							connectionsCached_.emplace_back(
+								&node_r,
+								&node_l,
+								1,
+								astar::utils::euclidDistance(node_l.getPos(), node_r.getPos()),
+								astar::utils::getAngleDeg(node_l.getPos(), node_r.getPos()));
 						}
 					}
 				}
@@ -365,14 +417,10 @@ namespace astar
 		}
 	}
 
-	float Graph::getAngleDeg(const sf::Vector2f p1, const sf::Vector2f p2) const
+	Graph::Graph() : drawDistance_{ false }, savedNode_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 10.f }, drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}
 	{
-		return std::atan2(p1.y - p2.y, p1.x - p2.x) * 57.30659025f;
-	}
-
-	Graph::Graph() : drawDistance_{ false }, savedNode_{}, nodesChanged_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 10.f }, drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}
-	{
-		nodesCached_.reserve(1000);
+		nodesCached_.reserve(200);
+		connectionsCached_.reserve(200);
 		font_.loadFromFile("mono.ttf");
 		connectionText_.setFont(font_);
 		connectionText_.setString("Connection Mode: False");

@@ -9,9 +9,10 @@
 #include <functional>
 #include <optional>
 
+
 namespace
 {
-	using Command = std::tuple<std::string, std::function<void(std::optional<std::vector<std::string>>)>, bool>;
+	using Command = std::tuple<std::string, std::function<void(const std::vector<std::string>&)>, bool>;
 }
 
 namespace astar
@@ -20,7 +21,7 @@ namespace astar
 	{
 		void operator=(const Console&) = delete;
 		Console(const Console&) = delete;
-		static Console& getInstance();
+		static Console& get();
 		void handleInput(const sf::Keyboard::Key key);
 		void toggle();
 		void addChar(const char c);

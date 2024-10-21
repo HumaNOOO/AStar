@@ -11,10 +11,10 @@ int main()
 	constexpr unsigned windowWidth{ 1270 };
 	constexpr unsigned windowHeight{ 768 };
 	sf::RenderWindow window(sf::VideoMode(windowWidth, windowHeight), "A*", sf::Style::Default, cs);
-	astar::Console::getInstance().resetCarriage({ 4, windowHeight - 20 });
+	astar::Console::get().resetCarriage({ 4, windowHeight - 20 });
 	window.setVerticalSyncEnabled(true);
 	bool movingNode{ false };
-	astar::Graph::getInstance().setDrawIds(true);
+	astar::Graph::get().setDrawIds(true);
 
 	while (window.isOpen())
 	{
@@ -28,11 +28,11 @@ int main()
 				if (event.type == sf::Event::MouseButtonReleased)
 				{
 					movingNode = false;
-					astar::Graph::getInstance().clearSavedNode();
+					astar::Graph::get().clearSavedNode();
 				}
 				else 
 				{
-					astar::Graph::getInstance().moveNode(mousePos);
+					astar::Graph::get().moveNode(mousePos);
 					break;
 				}
 			}
@@ -44,47 +44,47 @@ int main()
 				break;
 			case sf::Event::Resized:
 				window.setView(sf::View(sf::FloatRect(0, 0, static_cast<float>(event.size.width), static_cast<float>(event.size.height))));
-				astar::Console::getInstance().resetCarriage({ 4, static_cast<float>(event.size.height) });
+				astar::Console::get().resetCarriage({ 4, static_cast<float>(event.size.height) });
 				break;
 			case sf::Event::TextEntered:
-				if (astar::Console::getInstance().isOpen())
+				if (astar::Console::get().isOpen())
 				{
 #ifdef _DEBUG
 					std::cout << "key pressed: " << event.key.code << '\n';
 #endif
-					astar::Console::getInstance().addChar(event.text.unicode);
-					astar::Console::getInstance().handleInput(event.key.code);
+					astar::Console::get().addChar(event.text.unicode);
+					astar::Console::get().handleInput(event.key.code);
 				}
 			break;
 			case sf::Event::KeyPressed:
 				switch (event.key.code)
 				{
 				case sf::Keyboard::Tilde:
-					astar::Console::getInstance().toggle();
+					astar::Console::get().toggle();
 					break;
 				case sf::Keyboard::Escape:
 					window.close();
 					break;
 				case sf::Keyboard::LShift:
-					astar::Graph::getInstance().clearSavedNode();
+					astar::Graph::get().clearSavedNode();
 					break;
 				case sf::Keyboard::Q:
-					astar::Graph::getInstance().selectNodes(mousePos);
+					astar::Graph::get().selectNodes(mousePos);
 					break;
 				case sf::Keyboard::O:
-					astar::Graph::getInstance().increaseOffset(1);
+					astar::Graph::get().increaseOffset(1);
 					break;
 				case sf::Keyboard::P:
-					astar::Graph::getInstance().increaseOffset(-1);
+					astar::Graph::get().increaseOffset(-1);
 					break;
 				case sf::Keyboard::LAlt:
-					astar::Graph::getInstance().setCollision(mousePos);
+					astar::Graph::get().setCollision(mousePos);
 					break;
 				case sf::Keyboard::Left:
-					astar::Console::getInstance().moveCarriage(true);
+					astar::Console::get().moveCarriage(true);
 					break;
 				case sf::Keyboard::Right:
-					astar::Console::getInstance().moveCarriage(false);
+					astar::Console::get().moveCarriage(false);
 					break;
 				}
 				break;
@@ -92,34 +92,34 @@ int main()
 				switch (event.mouseButton.button)
 				{
 				case sf::Mouse::Left:
-					if (!astar::Graph::getInstance().isBuildConnectionMode())
+					if (!astar::Graph::get().isBuildConnectionMode())
 					{
-						if (astar::Graph::getInstance().checkMouseOnSomething(mousePos))
+						if (astar::Graph::get().checkMouseOnSomething(mousePos))
 						{
 							movingNode = true;
 						}
 						else
 						{
-							astar::Graph::getInstance().addNode(mousePos);
+							astar::Graph::get().addNode(mousePos);
 						}
 					}
 					else
 					{
-						astar::Graph::getInstance().makeConnection(mousePos);
+						astar::Graph::get().makeConnection(mousePos);
 					}
 					break;
 				case sf::Mouse::Right:
-					astar::Graph::getInstance().checkAndDelete(mousePos);
+					astar::Graph::get().checkAndDelete(mousePos);
 					break;
 				}
 			}
 		}
 
 		window.clear();
-		astar::Graph::getInstance().draw(window, mousePos);
-		if (astar::Console::getInstance().isOpen())
+		astar::Graph::get().draw(window, mousePos);
+		if (astar::Console::get().isOpen())
 		{
-			astar::Console::getInstance().draw(window);
+			astar::Console::get().draw(window);
 		}
 		window.display();
 	}
