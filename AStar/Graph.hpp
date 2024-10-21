@@ -14,7 +14,7 @@ namespace astar
 		Graph(const Graph&) = delete;
 		static Graph& get();
 		void resetIndex();
-		bool addNode(const sf::Vector2f& pos, const int id = -1);
+		bool addNode(const sf::Vector2f& pos, const int id = -1, const bool collision = false);
 		void draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos);
 		void checkAndDelete(const sf::Vector2f& mousePos);
 		void toggleDrawDistance();
@@ -35,6 +35,10 @@ namespace astar
 		bool setEnd(const int id);
 		const std::vector<std::pair<int, int>>& getConnectionsCRef() const;
 		const std::vector<Node>& getNodesCRef() const;
+		void drawPath();
+		void executeAStar();
+		void toggleRapidConnect();
+		bool isRapidConnect() const;
 	private:
 		bool nodeWithIdExists(const int id) const;
 		bool connectionExists(const std::pair<int, int>& connection) const;
@@ -52,6 +56,7 @@ namespace astar
 		int freeInd_;
 		bool shouldRecalculate_;
 		bool buildConnectionMode_;
+		bool rapidConnect_;
 		Node* startTarget_;
 		Node* endTarget_;
 		std::vector<std::pair<int, int>> connections_;

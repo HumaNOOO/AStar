@@ -1,21 +1,21 @@
 #include "Node.hpp"
 #include <iostream>
 #include <format>
-
+#include "Graph.hpp"
 
 namespace astar
 {
-	Node::Node() : id_{}, isCollision_{}
+	Node::Node() : id_{}, isCollision_{}, gScore_{}, fScore_{}, parent_{}
 	{
 	}
 
-	Node::Node(const float x, const float y, const int id) : isCollision_{}, connections_{}, id_{ id }
+	Node::Node(const float x, const float y, const int id, const bool collision) : isCollision_{ collision }, connections_{}, id_{ id }, gScore_{ std::numeric_limits<float>::max() }, fScore_{ std::numeric_limits<float>::max() }, parent_{ nullptr }
 	{
 		circle_.setPosition(x, y);
 		circle_.setRadius(radius_);
 		circle_.setOrigin(radius_, radius_);
 		circle_.setFillColor(sf::Color::Green);
-		circle_.setOutlineColor(sf::Color::Blue);
+		circle_.setOutlineColor(collision ? sf::Color::Red : sf::Color::White);
 		circle_.setOutlineThickness(border_);
 
 #ifdef _DEBUG
@@ -35,7 +35,7 @@ namespace astar
 
 	bool Node::isMouseOver(const sf::Vector2f& mousePos) const
 	{
-		return std::sqrtf(std::powf(mousePos.x - circle_.getPosition().x, 2) + std::powf(mousePos.y - circle_.getPosition().y, 2)) < (radius_ + border_);
+		return getDistanceFromMouse(mousePos) < (radius_ + border_ + (astar::Graph::get().isRapidConnect() ? 30.f : 0.f));
 	}
 
 	float Node::getDistanceFromMouse(const sf::Vector2f mousePos) const
@@ -50,26 +50,12 @@ namespace astar
 
 	void Node::toggleCollision()
 	{
-		isCollision_ = !isCollision_;
-
-		if (isCollision_)
-		{
-			circle_.setFillColor(sf::Color::Red);
-		}
-		else
-		{
-			circle_.setFillColor(sf::Color::Green);
-		}
+		circle_.setOutlineColor((isCollision_ = !isCollision_) ? sf::Color::Red : sf::Color::White);
 	}
 
 	bool Node::isCollision() const
 	{
 		return isCollision_;
-	}
-
-	void Node::draw(sf::RenderTarget& rt) const
-	{
-		rt.draw(circle_);
 	}
 
 	Node& Node::operator=(const Node& other)

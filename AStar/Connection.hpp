@@ -8,10 +8,9 @@ namespace astar
 	struct Connection
 	{
 		sf::RectangleShape line_;
-		const Node* end_;
-		const Node* start_;
+		Node* end_;
+		Node* start_;
 		unsigned int cost_;
-		Connection(const Node* start, const Node* end, unsigned int cost, const float distance, const float angle);
-		void draw(sf::RenderTarget& rt) const;
+		Connection(Node* start, Node* end, unsigned int cost, const float distance, const float angle);
 	};
 }

@@ -178,7 +178,7 @@ namespace astar
 				}
 				else
 				{
-					history_.emplace_back("&&Runknown parameter!");
+					history_.emplace_back("&&Runknown parameter '" + args[0] + "'!");
 				}
 			}, true);
 		callbacks_.emplace_back("load", [this](const std::vector<std::string>& args)
@@ -193,7 +193,7 @@ namespace astar
 				}
 
 				std::string line;
-				std::vector<std::tuple<float, float, int>> splitNodes;
+				std::vector<std::tuple<float, float, int, bool>> splitNodes;
 				std::vector<std::string> stringsToSplit;
 
 				while (std::getline(file, line) && line != "\n")
@@ -214,7 +214,7 @@ namespace astar
 				for (auto& str : stringsToSplit)
 				{
 					++count;
-					if (std::ranges::count(str, ',') != 3)
+					if (std::ranges::count(str, ',') != 4)
 					{
 						history_.emplace_back("&&Rill formed data '" + str + "' - skipping\n");
 						continue;
@@ -223,9 +223,9 @@ namespace astar
 					std::vector<std::string> split;
 					splitString(split, str, ',');
 
-					if (split.size() != 4)
+					if (split.size() != 5)
 					{
-						history_.emplace_back(std::format("&&Rnumber of fields in '{}' at line number {} is wrong, expected 4 but got {} - skipping\n", str, count, split.size()));
+						history_.emplace_back(std::format("&&Rnumber of fields in '{}' at line number {} is wrong, expected 5 but got {} - skipping\n", str, count, split.size()));
 						continue;
 					}
 
@@ -248,7 +248,7 @@ namespace astar
 
 					try
 					{
-						splitNodes.push_back({ std::stof(split[0]), std::stof(split[1]), std::stof(split[2]) });
+						splitNodes.push_back({ std::stof(split[0]), std::stof(split[1]), std::stof(split[2]), std::stoi(split[3]) });
 					}
 					catch (const std::exception& e)
 					{
@@ -257,14 +257,14 @@ namespace astar
 					}
 				}
 
-				for (const auto& [x, y, id] : splitNodes)
+				for (const auto& [x, y, id, isCollision] : splitNodes)
 				{
-					if (astar::Graph::get().addNode({ x,y }, id))
+					if (astar::Graph::get().addNode({ x,y }, id, isCollision))
 					{
 #ifdef _DEBUG
-						std::cout << std::format("read node data (x, y, id): ({}, {}, {})\n", x, y, id);
+						std::cout << std::format("read node data (x, y, id, collision): ({}, {}, {}, {})\n", x, y, id, isCollision ? "true" : "false");
 #endif
-						ss << std::format("adding node at ({},{}) with id {}\n", x, y, id);
+						ss << std::format("adding node at ({},{}) with id {} and collision {}\n", x, y, id, isCollision ? "on" : "off");
 					}
 					else
 					{
@@ -325,13 +325,24 @@ namespace astar
 					}
 					connections.erase(connections.end() - 1);
 
-					file << std::format("{},{},{},{}\n", node.getPos().x, node.getPos().y, node.id(), connections);
+					file << std::format("{},{},{},{},{}\n", node.getPos().x, node.getPos().y, node.id(), static_cast<int>(node.isCollision()), connections);
 
-					ss << std::format("saving {},{},{},{}\n", node.getPos().x, node.getPos().y, node.id(), connections);
+					ss << std::format("saving {},{},{},{},{}\n", node.getPos().x, node.getPos().y, node.id(), static_cast<int>(node.isCollision()), connections);
 				}
 
 				ss << "graph saved to file '" << args[0] << "'!\n";
 				history_.emplace_back(ss.str());
+			}, true);
+		callbacks_.emplace_back("exec", [this](const std::vector<std::string>& args)
+			{
+				if (args[0] == "astar")
+				{
+					astar::Graph::get().executeAStar();
+				}
+				else
+				{
+					history_.emplace_back("&&Runknown parameter '" + args[0] + "'!");
+				}
 			}, true);
 		font_.loadFromFile("mono.ttf");
 		text_.setFont(font_);

@@ -23,6 +23,8 @@ namespace astar
 
 	void Graph::resetIndex()
 	{
+		if (nodesCached_.empty()) return;
+
 		int maxId = nodesCached_.front().id();
 		for (const auto& node : nodesCached_)
 		{
@@ -32,10 +34,10 @@ namespace astar
 		freeInd_ = maxId;
 	}
 
-	bool Graph::addNode(const sf::Vector2f& pos, const int id)
+	bool Graph::addNode(const sf::Vector2f& pos, const int id, const bool collision)
 	{
 		if (nodeWithIdExists(id)) return false;
-		nodesCached_.emplace_back(pos.x, pos.y, id == -1 ? ++freeInd_ : id);
+		nodesCached_.emplace_back(pos.x, pos.y, id == -1 ? ++freeInd_ : id, collision);
 		return true;
 	}
 
@@ -134,18 +136,113 @@ namespace astar
 		return nodesCached_;
 	}
 
+	void Graph::drawPath()
+	{
+
+	}
+
+	void Graph::executeAStar()
+	{
+		if (!startTarget_ || !endTarget_)
+		{
+			return;
+		}
+
+		for (auto& connection : connectionsCached_)
+		{
+			connection.line_.setFillColor(sf::Color::White);
+
+			if (!connection.end_->isCollision())
+			{
+				connection.end_->circle_.setOutlineColor(sf::Color::White);
+			}
+
+			if (!connection.start_->isCollision())
+			{
+				connection.start_->circle_.setOutlineColor(sf::Color::White);
+			}
+		}
+
+		std::vector<Node*> openSet{ startTarget_ };
+		startTarget_->gScore_ = 0;
+		startTarget_->fScore_ = utils::euclidDistance(startTarget_->getPos(), endTarget_->getPos());
+
+		while (!openSet.empty())
+		{
+			Node* current = openSet.back();
+
+			if (current == endTarget_)
+			{
+				while (current->parent_)
+				{
+					for (auto& connection : connectionsCached_)
+					{
+						if ((connection.end_ == current || connection.end_ == current->parent_) && (connection.start_ == current || connection.start_ == current->parent_))
+						{
+							connection.line_.setFillColor(sf::Color::Blue);
+							connection.end_->circle_.setOutlineColor(sf::Color::Blue);
+							connection.start_->circle_.setOutlineColor(sf::Color::Blue);
+						}
+					}
+
+					current = current->parent_;
+				}
+
+				return;
+			}
+
+			openSet.pop_back();
+
+			for (Node* neighbor : current->connections_)
+			{
+				if (neighbor->isCollision()) continue;
+
+				const float tScore = current->gScore_ + utils::euclidDistance(current->getPos(), neighbor->getPos());
+
+				if (tScore < neighbor->gScore_)
+				{
+					neighbor->parent_ = current;
+					neighbor->gScore_ = tScore;
+					neighbor->fScore_ = tScore + utils::euclidDistance(neighbor->getPos(), endTarget_->getPos());
+
+					if (std::ranges::find(openSet, neighbor) == openSet.end())
+					{
+						openSet.push_back(neighbor);
+					}
+				}
+			}
+
+			std::ranges::sort(openSet, [](const Node* left, const Node* right) { return left->fScore_ > right->fScore_; });
+		}
+	}
+
+	void Graph::toggleRapidConnect()
+	{
+		rapidConnect_ = !rapidConnect_;
+	}
+
+	bool Graph::isRapidConnect() const
+	{
+		return rapidConnect_;
+	}
+
 	void Graph::draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos)
 	{
 		connectionText_.setString(buildConnectionMode_ ? "Connection Mode: True\n" : "Connection Mode: False\n");
 
+		if (buildConnectionMode_)
+		{
+			connectionText_.setString(connectionText_.getString() + (rapidConnect_ ? "Rapid Connect: True\n" : "Rapid Connect: False\n"));
+		}
+
 		if (startTarget_)
 		{
-			connectionText_.setString(connectionText_.getString() + "\nStart Target: " + std::to_string(startTarget_->id()));
+			connectionText_.setString(connectionText_.getString() + "Start Target: " + std::to_string(startTarget_->id()) + '\n');
 		}
 
 		if (endTarget_)
 		{
-			connectionText_.setString(connectionText_.getString() + "\nEnd Target: " + std::to_string(endTarget_->id()));
+			connectionText_.setString(connectionText_.getString() + "End Target: " + std::to_string(endTarget_->id()));
 		}
 
 		if (savedNode_)
@@ -159,12 +256,12 @@ namespace astar
 
 		for (const auto& connection : connectionsCached_)
 		{
-			connection.draw(rt);
+			rt.draw(connection.line_);
 		}
 
 		for (const auto& node : nodesCached_)
 		{
-			node.draw(rt);
+			rt.draw(node.circle_);
 
 			if (drawDistance_)
 			{
@@ -298,7 +395,7 @@ namespace astar
 #endif
 
 
-					savedNode_ = nullptr;
+					savedNode_ = &node;
 				}
 				else
 				{
@@ -417,7 +514,7 @@ namespace astar
 		}
 	}
 
-	Graph::Graph() : drawDistance_{ false }, savedNode_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 10.f }, drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}
+	Graph::Graph() : drawDistance_{ false }, savedNode_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 10.f }, drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}, rapidConnect_{}
 	{
 		nodesCached_.reserve(200);
 		connectionsCached_.reserve(200);

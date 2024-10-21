@@ -9,7 +9,7 @@ namespace astar
 	{
 	public:
 		Node();
-		Node(const float x, const float y, const int id);
+		Node(const float x, const float y, const int id, const bool collision = false);
 		Node(const Node& other) = default;
 		sf::Vector2f getPos() const;
 		bool isMouseOver(const sf::Vector2f& mousePos) const;
@@ -17,7 +17,6 @@ namespace astar
 		int id() const;
 		void toggleCollision();
 		bool isCollision() const;
-		void draw(sf::RenderTarget& rt) const;
 		static constexpr float radius_{ 26.f };
 		static constexpr float border_{ 4.f };
 		std::vector<Node*> connections_;
@@ -25,6 +24,9 @@ namespace astar
 		void changePos(const sf::Vector2f& mousePos);
 		Node& operator=(const Node& other);
 		Node& operator=(Node&& other) noexcept;
+		float gScore_;
+		float fScore_;
+		Node* parent_;
 
 	private:
 		int id_;

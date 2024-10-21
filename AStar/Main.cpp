@@ -15,6 +15,9 @@ int main()
 	window.setVerticalSyncEnabled(true);
 	bool movingNode{ false };
 	astar::Graph::get().setDrawIds(true);
+	sf::Clock clk;
+	bool rapidConnect{ false };
+	float rapidConnectDelay{ 0.01f };
 
 	while (window.isOpen())
 	{
@@ -74,8 +77,18 @@ int main()
 				case sf::Keyboard::O:
 					astar::Graph::get().increaseOffset(1);
 					break;
+				case sf::Keyboard::C:
+					astar::Graph::get().clearSavedNode();
+					break;
 				case sf::Keyboard::P:
 					astar::Graph::get().increaseOffset(-1);
+					break;
+				case sf::Keyboard::V:
+					astar::Graph::get().toggleRapidConnect();
+					rapidConnect = !rapidConnect;
+					break;
+				case sf::Keyboard::B:
+					astar::Graph::get().toggleConnectionMode();
 					break;
 				case sf::Keyboard::LAlt:
 					astar::Graph::get().setCollision(mousePos);
@@ -109,11 +122,26 @@ int main()
 					}
 					break;
 				case sf::Mouse::Right:
-					astar::Graph::get().checkAndDelete(mousePos);
+					if (astar::Graph::get().isBuildConnectionMode())
+					{
+						astar::Graph::get().setCollision(mousePos);
+					}
+					else
+					{
+						astar::Graph::get().checkAndDelete(mousePos);
+					}
 					break;
 				}
 			}
 		}
+
+		if (rapidConnect && rapidConnectDelay <= 0.f && sf::Keyboard::isKeyPressed(sf::Keyboard::LControl) && sf::Mouse::isButtonPressed(sf::Mouse::Left) && astar::Graph::get().isBuildConnectionMode())
+		{
+			astar::Graph::get().makeConnection(mousePos);
+			rapidConnectDelay = 0.01f;
+		}
+
+		rapidConnectDelay -= clk.restart().asSeconds();
 
 		window.clear();
 		astar::Graph::get().draw(window, mousePos);
