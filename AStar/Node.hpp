@@ -11,9 +11,9 @@ namespace astar
 		Node();
 		Node(const float x, const float y, const int id, const bool collision = false);
 		Node(const Node& other) = default;
-		sf::Vector2f getPos() const;
+		sf::Vector2f pos() const;
 		bool isMouseOver(const sf::Vector2f& mousePos) const;
-		float getDistanceFromMouse(const sf::Vector2f mousePos) const;
+		float distanceFromMouse(const sf::Vector2f mousePos) const;
 		int id() const;
 		void toggleCollision();
 		bool isCollision() const;

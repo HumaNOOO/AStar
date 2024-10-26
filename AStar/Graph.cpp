@@ -3,6 +3,8 @@
 #include <iostream>
 #include "Timer.hpp"
 #include "Utils.hpp"
+#include <random>
+#include "Console.hpp"
 
 
 namespace
@@ -37,8 +39,13 @@ namespace astar
 	bool Graph::addNode(const sf::Vector2f& pos, const int id, const bool collision)
 	{
 		if (nodeWithIdExists(id)) return false;
-		nodesCached_.emplace_back(pos.x, pos.y, id == -1 ? ++freeInd_ : id, collision);
+		nodesCached_.emplace_back(pos.x, pos.y, id < 0 ? ++freeInd_ : id, collision);
 		return true;
+	}
+
+	void Graph::addNodeForce(const sf::Vector2f pos, const int id)
+	{
+		nodesCached_.emplace_back(pos.x, pos.y, id < 0 ? ++freeInd_ : id, false);
 	}
 
 	void Graph::increaseOffset(const float offset)
@@ -59,8 +66,7 @@ namespace astar
 		}
 		else
 		{
-			startTarget_ = nullptr;
-			endTarget_ = nullptr;
+			startTarget_ = endTarget_ = nullptr;
 		}
 	}
 
@@ -72,6 +78,11 @@ namespace astar
 	void Graph::toggleConnectionMode()
 	{
 		connectionText_.setString((buildConnectionMode_ = !buildConnectionMode_) ? "Connection Mode: True\n" : "Connection Mode: False\n");
+	}
+
+	void Graph::toggleDrawScore()
+	{
+		drawScore_ = !drawScore_;
 	}
 
 	bool Graph::setStart(const int id)
@@ -126,31 +137,40 @@ namespace astar
 		return false;
 	}
 
-	const std::vector<std::pair<int, int>>& Graph::getConnectionsCRef() const
+	const std::vector<std::pair<int, int>>& Graph::connectionsCRef() const
 	{
 		return connections_;
 	}
 
-	const std::vector<Node>& Graph::getNodesCRef() const
+	const std::vector<Connection>& Graph::connectionsCachedCRef() const
+	{
+		return connectionsCached_;
+	}
+
+	const std::vector<Node>& Graph::nodesCRef() const
 	{
 		return nodesCached_;
 	}
 
-	void Graph::drawPath()
+	std::optional<std::string> Graph::executeAStar()
 	{
-
-	}
-
-	void Graph::executeAStar()
-	{
+		Graph::get().setAStarResult(false, 0.f);
+		sf::Clock clk;
 		if (!startTarget_ || !endTarget_)
 		{
-			return;
+			return std::nullopt;
+		}
+
+		for (auto& node : nodesCached_)
+		{
+			node.fScore_ = std::numeric_limits<float>::max();
+			node.gScore_ = std::numeric_limits<float>::max();
+			node.parent_ = nullptr;
 		}
 
 		for (auto& connection : connectionsCached_)
 		{
-			connection.line_.setFillColor(sf::Color::White);
+			connection.line_.setFillColor(sf::Color(200, 200, 200));
 
 			if (!connection.end_->isCollision())
 			{
@@ -165,14 +185,16 @@ namespace astar
 
 		std::vector<Node*> openSet{ startTarget_ };
 		startTarget_->gScore_ = 0;
-		startTarget_->fScore_ = utils::euclidDistance(startTarget_->getPos(), endTarget_->getPos());
+		startTarget_->fScore_ = utils::euclidDistance(startTarget_->pos(), endTarget_->pos());
 
 		while (!openSet.empty())
 		{
-			Node* current = openSet.back();
+			Node* current{ openSet.back() };
 
 			if (current == endTarget_)
 			{
+				Graph::get().setAStarResult(true, current->fScore_);
+
 				while (current->parent_)
 				{
 					for (auto& connection : connectionsCached_)
@@ -188,7 +210,7 @@ namespace astar
 					current = current->parent_;
 				}
 
-				return;
+				return std::to_string(clk.restart().asSeconds());
 			}
 
 			openSet.pop_back();
@@ -197,13 +219,13 @@ namespace astar
 			{
 				if (neighbor->isCollision()) continue;
 
-				const float tScore = current->gScore_ + utils::euclidDistance(current->getPos(), neighbor->getPos());
+				const float tScore = current->gScore_ + utils::euclidDistance(current->pos(), neighbor->pos());
 
 				if (tScore < neighbor->gScore_)
 				{
 					neighbor->parent_ = current;
 					neighbor->gScore_ = tScore;
-					neighbor->fScore_ = tScore + utils::euclidDistance(neighbor->getPos(), endTarget_->getPos());
+					neighbor->fScore_ = tScore + utils::euclidDistance(neighbor->pos(), endTarget_->pos());
 
 					if (std::ranges::find(openSet, neighbor) == openSet.end())
 					{
@@ -214,6 +236,8 @@ namespace astar
 
 			std::ranges::sort(openSet, [](const Node* left, const Node* right) { return left->fScore_ > right->fScore_; });
 		}
+
+		return std::nullopt;
 	}
 
 	void Graph::toggleRapidConnect()
@@ -226,7 +250,160 @@ namespace astar
 		return rapidConnect_;
 	}
 
-	void Graph::draw(sf::RenderTarget& rt, const sf::Vector2f& mousePos)
+	void Graph::generateRandomGraph(const int nodesCount, const float chance, const float radius)
+	{
+		const float originalChance{ chance };
+		constexpr int maxTries{ 10000 };
+		resetNodes();
+		std::uniform_real_distribution<float> dist(-radius, radius);
+		std::uniform_real_distribution<float> p(0.f, 1.f);
+		std::uniform_int_distribution<int> pathLength(2, nodesCount - 1);
+		static std::mt19937_64 mt(std::random_device{}());
+
+		sf::Vector2f pos{ dist(mt), dist(mt) };
+
+		int tries{ 0 };
+		for (int i = 0; i < nodesCount; ++i)
+		{
+			bool valid = true;
+			while (!isValidPosition(pos, radius) && ++tries < maxTries)
+			{
+				valid = false;
+				pos = { dist(mt), dist(mt) };
+				valid = true;
+			}
+
+			if (valid && tries != maxTries)
+			{
+				addNodeForce(pos);
+			}
+
+			tries = 0;
+		}
+
+		std::vector<int> pathIds;
+		//pathIds.resize(pathLength(mt));
+		//
+		//std::string command{ "path 1" };
+		//
+		//for (int& id : pathIds)
+		//{
+		//	id = pathLength(mt);
+		//}
+
+		pathIds.resize(nodesCount);
+
+		for (int i = 0; i < pathIds.size(); i++)
+		{
+			pathIds[i] = i + 1;
+		}
+
+		//std::ranges::sort(pathIds);
+
+		//pathIds.erase(std::unique(pathIds.begin(), pathIds.end()), pathIds.end());
+
+		//for (const int id : pathIds)
+		//{
+		//	command += " " + std::to_string(id);
+		//}
+
+		//long iter = 0;
+		for (int i = 1; i <= nodesCount; i++)
+		{
+			for (int j = i+1; j <= nodesCount; j++)
+			{
+				//iter++;
+				if (p(mt) < chance)
+				{
+					addIdConnectionForce(i, j);
+					//chance = originalChance;
+				}
+			}
+		}
+
+		//std::cout << chance << '\n';
+		//std::cout << "ITERATIONS: " << iter << '\n';
+
+		//command += " " + std::to_string(nodesCount);
+
+		//std::string linkCommand{ "link" };
+		std::string setStart{ "set start 1" };
+		std::string setEnd{ "set end " + std::to_string(nodesCount) };
+		Console::get().executeCommand(setStart);
+		Console::get().executeCommand(setEnd);
+		//Console::get().executeCommand(command);
+	}
+
+	bool Graph::isValidPosition(const sf::Vector2f pos, const float radius)
+	{
+		if (utils::euclidDistance({ 0,0 }, pos) > radius)
+		{
+			return false;
+		}
+
+		constexpr float distSquared{ 68.f * 68.f };
+		for (const Node& node : nodesCached_)
+		{
+			if (utils::euclidDistanceSquared(node.pos(), pos) <= distSquared)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	void Graph::draw(const sf::Vector2f& mousePos)
+	{
+		if (savedNode_)
+		{
+			sf::RectangleShape rect({ savedNode_->distanceFromMouse(mousePos), 5 });
+			rect.setOrigin(0, 2.5);
+			rect.setRotation(utils::getAngleDeg(mousePos, savedNode_->pos()));
+			rect.setPosition(savedNode_->pos());
+			rt_->draw(rect);
+		}
+
+		for (const auto& connection : connectionsCached_)
+		{
+			rt_->draw(connection.line_);
+		}
+
+		for (const auto& node : nodesCached_)
+		{
+			rt_->draw(node.circle_);
+
+			if (drawDistance_)
+			{
+				text_.setPosition(node.pos().x - 35.f, node.pos().y + 32.f);
+				text_.setString(std::to_string(node.distanceFromMouse(mousePos)));
+				text_.setFillColor(sf::Color::White);
+				rt_->draw(text_);
+			}
+
+			if (drawIds_)
+			{
+				const std::string nodeId = std::to_string(node.id());
+				const float width = nodeId.size() * offset_ / 2.f;
+				text_.setPosition(node.pos().x - width, node.pos().y - 14.f);
+				text_.setString(nodeId);
+				text_.setFillColor(sf::Color::Black);
+				text_.setCharacterSize(24);
+				rt_->draw(text_);
+				text_.setCharacterSize(16);
+			}
+
+			if (drawScore_)
+			{
+				text_.setPosition(node.pos().x - 100.f, node.pos().y + 30.f);
+				text_.setString(std::format("fScore: {}\ngScore: {}", node.fScore_, node.gScore_));
+				text_.setFillColor(sf::Color::White);
+				rt_->draw(text_);
+			}
+		}
+	}
+
+	void Graph::drawStats()
 	{
 		connectionText_.setString(buildConnectionMode_ ? "Connection Mode: True\n" : "Connection Mode: False\n");
 
@@ -245,44 +422,7 @@ namespace astar
 			connectionText_.setString(connectionText_.getString() + "End Target: " + std::to_string(endTarget_->id()));
 		}
 
-		if (savedNode_)
-		{
-			sf::RectangleShape rect({ savedNode_->getDistanceFromMouse(mousePos), 5 });
-			rect.setOrigin(0, 2.5);
-			rect.setRotation(utils::getAngleDeg(mousePos, savedNode_->getPos()));
-			rect.setPosition(savedNode_->getPos());
-			rt.draw(rect);
-		}
-
-		for (const auto& connection : connectionsCached_)
-		{
-			rt.draw(connection.line_);
-		}
-
-		for (const auto& node : nodesCached_)
-		{
-			rt.draw(node.circle_);
-
-			if (drawDistance_)
-			{
-				text_.setPosition(node.getPos().x - 35.f, node.getPos().y + 32.f);
-				text_.setString(std::to_string(node.getDistanceFromMouse(mousePos)));
-				text_.setFillColor(sf::Color::White);
-				rt.draw(text_);
-			}
-
-			if (drawIds_)
-			{
-				const std::string nodeId = std::to_string(node.id());
-				const float width = nodeId.size() * offset_ / 2.f;
-				text_.setPosition(node.getPos().x - width, node.getPos().y - 8.f);
-				text_.setString(nodeId);
-				text_.setFillColor(sf::Color::Black);
-				rt.draw(text_);
-			}
-		}
-
-		rt.draw(connectionText_);
+		rt_->draw(connectionText_);
 		connectionText_.setString("");
 	}
 
@@ -383,8 +523,8 @@ namespace astar
 					connectionsCached_.emplace_back(savedNode_,
 						&node,
 						1,
-						astar::utils::euclidDistance(savedNode_->getPos(), node.getPos()),
-						astar::utils::getAngleDeg(node.getPos(), savedNode_->getPos()));
+						utils::euclidDistance(savedNode_->pos(), node.pos()),
+						utils::getAngleDeg(node.pos(), savedNode_->pos()));
 
 #ifdef _DEBUG
 					for (const auto& [left, right] : connections_)
@@ -406,29 +546,60 @@ namespace astar
 		}
 	}
 
+	void Graph::addIdConnectionForce(const int id1, const int id2)
+	{
+		connections_.push_back({ id1,id2 });
+
+		for (Node& nodeL : nodesCached_)
+		{
+			if (nodeL.id() == id1)
+			{
+				for (Node& nodeR : nodesCached_)
+				{
+					if (nodeR.id() == id2)
+					{
+						nodeL.connections_.emplace_back(&nodeR);
+						nodeR.connections_.emplace_back(&nodeL);
+
+						connectionsCached_.emplace_back(
+							&nodeR,
+							&nodeL,
+							1,
+							utils::euclidDistance(nodeL.pos(), nodeR.pos()),
+							utils::getAngleDeg(nodeL.pos(), nodeR.pos()));
+
+						return;
+					}
+				}
+			}
+		}
+	}
+
 	bool Graph::addIdConnection(const std::pair<int, int>& connection)
 	{
+		if (connection.first == connection.second) return false;
+
 		if (!connectionExists(connection))
 		{
 			connections_.push_back(connection);
 
-			for (Node& node_l : nodesCached_)
+			for (Node& nodeL : nodesCached_)
 			{
-				if (node_l.id() == connection.first)
+				if (nodeL.id() == connection.first)
 				{
-					for (Node& node_r : nodesCached_)
+					for (Node& nodeR : nodesCached_)
 					{
-						if (node_r.id() == connection.second)
+						if (nodeR.id() == connection.second)
 						{
-							node_l.connections_.emplace_back(&node_r);
-							node_r.connections_.emplace_back(&node_l);
+							nodeL.connections_.emplace_back(&nodeR);
+							nodeR.connections_.emplace_back(&nodeL);
 
 							connectionsCached_.emplace_back(
-								&node_r,
-								&node_l,
+								&nodeR,
+								&nodeL,
 								1,
-								utils::euclidDistance(node_l.getPos(), node_r.getPos()),
-								utils::getAngleDeg(node_l.getPos(), node_r.getPos()));
+								utils::euclidDistance(nodeL.pos(), nodeR.pos()),
+								utils::getAngleDeg(nodeL.pos(), nodeR.pos()));
 
 							return true;
 						}
@@ -453,7 +624,7 @@ namespace astar
 
 	void Graph::deleteNode(const int id)
 	{
-		std::erase_if(connectionsCached_, [id](const Connection& con) { return con.start_->id() == id || con.end_->id() == id; });
+		std::erase_if(connections_, [id](const std::pair<int, int>& con) { return con.first == id || con.second == id; });
 
 		std::erase_if(nodesCached_, [id](const Node& node)
 			{
@@ -462,8 +633,6 @@ namespace astar
 #endif
 				return node.id() == id;
 			});
-
-		std::erase_if(connections_, [id](const std::pair<int, int>& con) { return con.first == id || con.second == id; });
 
 		handleRecalculate();
 	}
@@ -475,7 +644,7 @@ namespace astar
 
 	bool Graph::connectionExists(const std::pair<int, int>& connection) const
 	{
-		return !std::ranges::none_of(connections_, [&connection](const std::pair<int, int>& conn)
+		return std::ranges::any_of(connections_, [&connection](const std::pair<int, int>& conn)
 			{
 				return conn == connection;
 			});
@@ -488,25 +657,27 @@ namespace astar
 			nd.connections_.clear();
 		}
 
+		connectionsCached_.clear();
+
 		for (const auto& [left, right] : connections_)
 		{
-			for (Node& node_l : nodesCached_)
+			for (Node& nodeL : nodesCached_)
 			{
-				if (node_l.id() == left)
+				if (nodeL.id() == left)
 				{
-					for (Node& node_r : nodesCached_)
+					for (Node& nodeR : nodesCached_)
 					{
-						if (node_r.id() == right)
+						if (nodeR.id() == right)
 						{
-							node_l.connections_.emplace_back(&node_r);
-							node_r.connections_.emplace_back(&node_l);
+							nodeL.connections_.emplace_back(&nodeR);
+							nodeR.connections_.emplace_back(&nodeL);
 
 							connectionsCached_.emplace_back(
-								&node_r,
-								&node_l,
+								&nodeR,
+								&nodeL,
 								1,
-								astar::utils::euclidDistance(node_l.getPos(), node_r.getPos()),
-								astar::utils::getAngleDeg(node_l.getPos(), node_r.getPos()));
+								utils::euclidDistance(nodeL.pos(), nodeR.pos()),
+								utils::getAngleDeg(nodeL.pos(), nodeR.pos()));
 						}
 					}
 				}
@@ -514,10 +685,28 @@ namespace astar
 		}
 	}
 
-	Graph::Graph() : drawDistance_{ false }, savedNode_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 10.f }, drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}, rapidConnect_{}
+	void Graph::setRenderTarget(sf::RenderTarget* rt)
 	{
-		nodesCached_.reserve(200);
-		connectionsCached_.reserve(200);
+		rt_ = rt;
+	}
+
+	void Graph::setAStarResult(const bool result, const float pathLength)
+	{
+		pathFound_ = result;
+		pathLength_ = pathLength;
+	}
+
+	float Graph::pathLength() const
+	{
+		return pathLength_;
+	}
+
+	Graph::Graph() : drawDistance_{ false }, savedNode_{}, freeInd_{}, shouldRecalculate_{}, offset_{ 15.f },
+					 drawIds_{}, startTarget_{}, endTarget_{}, buildConnectionMode_{}, rapidConnect_{}, drawScore_{}, rt_{}, pathLength_{}, pathFound_{}
+	{
+		nodesCached_.reserve(10000);
+		connectionsCached_.reserve(20000);
+		connections_.reserve(20000);
 		font_.loadFromFile("mono.ttf");
 		connectionText_.setFont(font_);
 		connectionText_.setString("Connection Mode: False");

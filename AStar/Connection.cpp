@@ -11,8 +11,11 @@ namespace astar
 		line_.setSize({ distance, 5 });
 		line_.setOrigin(0, 2.5);
 		line_.setRotation(angle);
-		line_.setPosition(start->getPos());
+		line_.setPosition(start->pos());
+		line_.setFillColor(sf::Color(200, 200, 200));
 
-		std::cout << std::format("adding connection at ({},{}) with angle {} and length {}\n", start->getPos().x, start->getPos().y, angle, distance);
+#ifdef _DEBUG
+		std::cout << std::format("adding connection at ({},{}) with angle {} and length {}\n", start->pos().x, start->pos().y, angle, distance);
+#endif
 	}
 }

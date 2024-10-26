@@ -29,10 +29,10 @@ namespace astar
 		void resetCarriage(const sf::Vector2f& carriagePos);
 		void draw(sf::RenderTarget& rt);
 		void moveCarriage(const bool left);
+		void executeCommand(std::string& command);
 	private:
 		Console();
 		constexpr static int carriageOffset_{ 10 };
-		void executeCommand(std::string& command);
 		bool consoleOpen_;
 		size_t carriagePos_;
 		sf::RectangleShape carriage_;

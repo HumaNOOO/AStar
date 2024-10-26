@@ -17,9 +17,10 @@ namespace astar
 		circle_.setFillColor(sf::Color::Green);
 		circle_.setOutlineColor(collision ? sf::Color::Red : sf::Color::White);
 		circle_.setOutlineThickness(border_);
+		connections_.reserve(100);
 
 #ifdef _DEBUG
-		std::cout << std::format("Creating node at ({},{}) with id={}\n", x, y, id);
+		std::cout << std::format("Creating node at ({},{}) with id {} and collision {}\n", x, y, id, collision ? "on" : "off");
 #endif
 	}
 
@@ -28,17 +29,17 @@ namespace astar
 		circle_.setPosition(mousePos.x, mousePos.y);
 	}
 
-	sf::Vector2f Node::getPos() const
+	sf::Vector2f Node::pos() const
 	{
 		return circle_.getPosition();
 	}
 
 	bool Node::isMouseOver(const sf::Vector2f& mousePos) const
 	{
-		return getDistanceFromMouse(mousePos) < (radius_ + border_ + (astar::Graph::get().isRapidConnect() ? 30.f : 0.f));
+		return distanceFromMouse(mousePos) < (radius_ + border_ + (Graph::get().isRapidConnect() ? 30.f : 0.f));
 	}
 
-	float Node::getDistanceFromMouse(const sf::Vector2f mousePos) const
+	float Node::distanceFromMouse(const sf::Vector2f mousePos) const
 	{
 		return std::sqrtf(std::powf(mousePos.x - circle_.getPosition().x, 2) + std::powf(mousePos.y - circle_.getPosition().y, 2));
 	}

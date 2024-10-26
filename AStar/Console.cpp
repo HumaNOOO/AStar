@@ -56,15 +56,15 @@ namespace astar
 
 	Console::Console() : consoleOpen_{ false }, carriagePos_{ 1 }
 	{
-		callbacks_.emplace_back("reset", [](const std::vector<std::string>& args) { astar::Graph::get().resetNodes(); }, false);
+		callbacks_.emplace_back("reset", [](const std::vector<std::string>& args) { Graph::get().resetNodes(); }, false);
 		callbacks_.emplace_back("clear", [this](const std::vector<std::string>& args) { history_.clear(); }, false);
-		callbacks_.emplace_back("distance", [](const std::vector<std::string>& args) { astar::Graph::get().toggleDrawDistance(); }, false);
-		callbacks_.emplace_back("conn", [](const std::vector<std::string>& args) { astar::Graph::get().toggleConnectionMode(); }, false);
+		callbacks_.emplace_back("distance", [](const std::vector<std::string>& args) { Graph::get().toggleDrawDistance(); }, false);
+		callbacks_.emplace_back("conn", [](const std::vector<std::string>& args) { Graph::get().toggleConnectionMode(); }, false);
 		callbacks_.emplace_back("del", [](const std::vector<std::string>& args)
 			{
 				try
 				{
-					astar::Graph::get().deleteNode((std::stoi(args[0])));
+					Graph::get().deleteNode((std::stoi(args[0])));
 				}
 				catch (const std::exception& e)
 				{
@@ -75,7 +75,8 @@ namespace astar
 			}, true);
 		callbacks_.emplace_back("print", [this](const std::vector<std::string>& args)
 			{
-				const auto& connections = astar::Graph::get().getConnectionsCRef();
+				const auto& connections = Graph::get().connectionsCRef();
+				const auto& connectionsCached = Graph::get().connectionsCachedCRef();
 
 				if (connections.empty())
 				{
@@ -84,7 +85,7 @@ namespace astar
 				}
 
 				std::stringstream ss;
-				ss << "&&G" << connections.size() << " node connections:\n";
+				ss << "&&G" << connectionsCached.size() << " cached connections\n" << connections.size() << " node connections:\n";
 				std::ranges::for_each(connections, [&ss](const std::pair<int, int>& connection)
 					{
 						ss << connection.first << "<->" << connection.second << '\n';
@@ -125,10 +126,56 @@ namespace astar
 				ss << "&&G";
 				for (int i = 1; i < ids.size(); i++)
 				{
-					if (astar::Graph::get().addIdConnection({ ids[0], ids[i] }))
+					if (Graph::get().addIdConnection({ ids[0], ids[i] }))
 					{
 						ss << "adding connection " << ids[0] << "<->" << ids[i] << '\n';
 					}
+				}
+				history_.emplace_back(ss.str());
+			}, true);
+		callbacks_.emplace_back("path", [this](const std::vector<std::string>& args)
+			{
+				std::vector<int> ids;
+				ids.reserve(args.size());
+
+				if (args.size() < 2)
+				{
+					history_.emplace_back("&&Rincorrect number of arguments, need 2 or more!");
+					return;
+				}
+
+				std::stringstream ss;
+				ss << "&&R";
+				for (const auto& str : args)
+				{
+					try
+					{
+						ids.push_back(std::stoi(str));
+					}
+					catch (const std::exception& e)
+					{
+						ss << "can't convert '" << str << "' into a number: " << e.what() << '\n';
+					}
+				}
+
+				if (ss.str().size() > 3)
+				{
+					history_.emplace_back(ss.str());
+				}
+
+				ss.str("");
+				ss << "&&G";
+				for (int i = 0; i < ids.size() - 1; i++)
+				{
+					if (Graph::get().addIdConnection({ ids[i], ids[i+1] }))
+					{
+						ss << "adding connection " << ids[i] << "<->" << ids[i+1] << '\n';
+					}
+				}
+				if (ss.str().size() == 3)
+				{
+					history_.emplace_back("&&Rcommand failed");
+					return;
 				}
 				history_.emplace_back(ss.str());
 			}, true);
@@ -144,7 +191,7 @@ namespace astar
 				{
 					try
 					{
-						if (astar::Graph::get().setStart(std::stoi(args[1])))
+						if (Graph::get().setStart(std::stoi(args[1])))
 						{
 							history_.emplace_back("&&Gstart node id " + args[1]);
 						}
@@ -162,7 +209,7 @@ namespace astar
 				{
 					try
 					{
-						if (astar::Graph::get().setEnd(std::stoi(args[1])))
+						if (Graph::get().setEnd(std::stoi(args[1])))
 						{
 							history_.emplace_back("&&Gend node id " + args[1]);
 						}
@@ -207,7 +254,7 @@ namespace astar
 				std::stringstream ss;
 				ss << "&&G";
 
-				astar::Graph::get().resetNodes();
+				Graph::get().resetNodes();
 				std::vector<std::vector<float>> connectionsVec;
 
 				int count{};
@@ -259,11 +306,8 @@ namespace astar
 
 				for (const auto& [x, y, id, isCollision] : splitNodes)
 				{
-					if (astar::Graph::get().addNode({ x,y }, id, isCollision))
+					if (Graph::get().addNode({ x,y }, id, isCollision))
 					{
-#ifdef _DEBUG
-						std::cout << std::format("read node data (x, y, id, collision): ({}, {}, {}, {})\n", x, y, id, isCollision ? "true" : "false");
-#endif
 						ss << std::format("adding node at ({},{}) with id {} and collision {}\n", x, y, id, isCollision ? "on" : "off");
 					}
 					else
@@ -276,7 +320,7 @@ namespace astar
 				{
 					for (int i = 1; i < connection.size(); i++)
 					{
-						if (astar::Graph::get().addIdConnection({ connection[0], connection[i] }))
+						if (Graph::get().addIdConnection({ connection[0], connection[i] }))
 						{
 							ss << "adding connection " << connection[0] << "<->" << connection[i] << '\n';
 						}
@@ -287,7 +331,7 @@ namespace astar
 					}
 				}
 
-				astar::Graph::get().resetIndex();
+				Graph::get().resetIndex();
 
 				history_.emplace_back(ss.str());
 			}, true);
@@ -295,7 +339,7 @@ namespace astar
 			{
 				std::fstream file;
 				file.open(args[0], std::ios::out);
-				const std::vector<Node>& nodesRef = astar::Graph::get().getNodesCRef();
+				const std::vector<Node>& nodesRef = Graph::get().nodesCRef();
 
 				if (!file.is_open())
 				{
@@ -325,9 +369,9 @@ namespace astar
 					}
 					connections.erase(connections.end() - 1);
 
-					file << std::format("{},{},{},{},{}\n", node.getPos().x, node.getPos().y, node.id(), static_cast<int>(node.isCollision()), connections);
+					file << std::format("{},{},{},{},{}\n", node.pos().x, node.pos().y, node.id(), static_cast<int>(node.isCollision()), connections);
 
-					ss << std::format("saving {},{},{},{},{}\n", node.getPos().x, node.getPos().y, node.id(), static_cast<int>(node.isCollision()), connections);
+					ss << std::format("saving {},{},{},{},{}\n", node.pos().x, node.pos().y, node.id(), static_cast<int>(node.isCollision()), connections);
 				}
 
 				ss << "graph saved to file '" << args[0] << "'!\n";
@@ -337,11 +381,147 @@ namespace astar
 			{
 				if (args[0] == "astar")
 				{
-					astar::Graph::get().executeAStar();
+					auto result = Graph::get().executeAStar();
+
+					//return;
+
+					if (result)
+					{
+						history_.emplace_back("&&Gpath found, execution time: " + *result + "s");
+					}
+					else
+					{
+						history_.emplace_back("&&Gno path found");
+					}
 				}
 				else
 				{
 					history_.emplace_back("&&Runknown parameter '" + args[0] + "'!");
+				}
+			}, true);
+		callbacks_.emplace_back("save", [this](const std::vector<std::string>& args)
+			{
+				std::fstream file;
+				file.open(args[0], std::ios::out);
+				const std::vector<Node>& nodesRef = Graph::get().nodesCRef();
+
+				if (!file.is_open())
+				{
+					history_.emplace_back("&&Rcan't open file '" + args[0] + "'!\n");
+					return;
+				}
+				else if (nodesRef.empty())
+				{
+					file.close();
+					history_.emplace_back("&&Rno nodes to save!\n");
+					std::filesystem::remove(std::filesystem::path(args[0]));
+					return;
+				}
+
+				std::stringstream ss;
+				ss << "&&G";
+
+				for (const Node& node : nodesRef)
+				{
+					std::string connections;
+
+					connections += (std::to_string(node.id()) + ':');
+
+					for (const Node* conn : node.connections_)
+					{
+						connections += (std::to_string(conn->id()) + ':');
+					}
+					connections.erase(connections.end() - 1);
+
+					file << std::format("{},{},{},{},{}\n", node.pos().x, node.pos().y, node.id(), static_cast<int>(node.isCollision()), connections);
+
+					ss << std::format("saving {},{},{},{},{}\n", node.pos().x, node.pos().y, node.id(), static_cast<int>(node.isCollision()), connections);
+				}
+
+				ss << "graph saved to file '" << args[0] << "'!\n";
+				history_.emplace_back(ss.str());
+			}, true);
+		callbacks_.emplace_back("generate", [this](const std::vector<std::string>& args)
+			{
+				if (args.size() != 3)
+				{
+					history_.emplace_back("&&Rincorrect number of arguments, need 3!");
+					return;
+				}
+
+				std::vector<float> nodesConnectionsCount;
+
+				for (const std::string& arg : args)
+				{
+					try
+					{
+						for (const std::string& arg : args)
+						{
+							nodesConnectionsCount.push_back(std::stof(arg));
+						}
+					}
+					catch (const std::exception& e)
+					{
+						history_.emplace_back("&&Rcan't convert '" + arg + "' to a number: " + e.what());
+						return;
+					}
+				}
+
+				Graph::get().generateRandomGraph(nodesConnectionsCount[0], nodesConnectionsCount[1], nodesConnectionsCount[2]);
+
+				history_.emplace_back("&&Ggenerated graph");
+			}, true);
+		callbacks_.emplace_back("generatetimeout", [this](const std::vector<std::string>& args)
+			{
+				if (args.size() != 4)
+				{
+					history_.emplace_back("&&Rincorrect number of arguments, need 4!");
+					return;
+				}
+
+				std::vector<float> nodesConnectionsCount;
+
+				for (const std::string& arg : args)
+				{
+					try
+					{
+						for (const std::string& arg : args)
+						{
+							nodesConnectionsCount.push_back(std::stof(arg));
+						}
+					}
+					catch (const std::exception& e)
+					{
+						history_.emplace_back("&&Rcan't convert '" + arg + "' to a number: " + e.what());
+						return;
+					}
+				}
+
+				float bestSoFar{};
+				float stop{ nodesConnectionsCount[3] };
+				sf::Clock stopTimer;
+				for (long long i = 0;; i++)
+				{
+					Graph::get().generateRandomGraph(nodesConnectionsCount[0], nodesConnectionsCount[1], nodesConnectionsCount[2]);
+					if (Graph::get().executeAStar() && Graph::get().pathLength() > bestSoFar)
+					{
+#ifdef _DEBUG
+						std::cout << "graphs generated: " << i << '\n';
+						std::cout << "path found! path length: " << Graph::get().pathLength() << '\n';
+						std::cout << "saving to bestgraph.txt\n";
+#endif
+						bestSoFar = Graph::get().pathLength();
+						std::string command{ "save bestgraph.txt" };
+						Console::get().executeCommand(command);
+						stop = nodesConnectionsCount[3];
+					}
+					history_.clear();
+					stop -= stopTimer.restart().asSeconds();
+
+					if (stop <= 0.f)
+					{
+						return;
+					}
 				}
 			}, true);
 		font_.loadFromFile("mono.ttf");
